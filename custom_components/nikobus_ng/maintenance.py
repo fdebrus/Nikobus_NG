@@ -265,8 +265,14 @@ class Maintenance:
                 self._file_issues(check)
                 if image is not None:
                     images[f"{address}_{module_type}.nkm"] = image
-                if check.checksum_ok and check.reported_checksum is not None:
-                    # A memory that checks out is the programming now known.
+                kept = self._hub.inventory.programming.get(address)
+                if (
+                    check.checksum_ok
+                    and check.reported_checksum is not None
+                    and (kept is None or kept.get("checksum") == check.reported_checksum)
+                ):
+                    # A memory that checks out is the programming now known. One that differs
+                    # from the checksum kept is a module reprogrammed: only reading its links settles that.
                     await self._async_record(address, module_type, check.reported_checksum)
             self.checked_at = dt_util.utcnow()
             self._hub.inventory.schedule_save()
@@ -296,6 +302,8 @@ class Maintenance:
     async def async_backup(self, addresses: list[str] | None = None) -> dict[str, Any]:
         """Check the modules and keep the memory of each in a folder of the config directory."""
         images = await self._async_check_all(addresses)
+        if not images:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="backup_nothing_read")
         summary = self.report(addresses)
         folder = Path(
             self._hub.hass.config.path(BACKUP_FOLDER, dt_util.now().strftime("%Y%m%d-%H%M%S"))

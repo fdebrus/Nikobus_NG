@@ -21,6 +21,7 @@ from nikobus_connect.discovery import PHASE_REGISTER_SCAN, InventoryQueryType
 from nikobus_connect.discovery.store import flatten_cf_broadcasts, is_button_backed_cf
 
 from .const import (
+    DATA_LINKS_TRIED,
     DOMAIN,
     INVENTORY_CLOSE_TIMEOUT,
     INVENTORY_PROBE_TIMEOUT,
@@ -67,6 +68,7 @@ class DiscoveryRunner:
         self._pass_finished = asyncio.Event()
         self._scenes: dict[str, dict[str, Any]] = {}
         self._corrupt: set[str] = set()
+        self._read_before: dict[str, str] = {}
 
     def start(self, module: str | None = None) -> None:
         """Start a discovery in the background. Raises when one is running.
@@ -94,6 +96,7 @@ class DiscoveryRunner:
     async def _async_run(self, module: str | None) -> None:
         hub = self._hub
         hub.apply_write_guard()
+        self._read_before = hub.inventory.links_read_marks()
         try:
             if module is None and not hub.inventory.from_project:
                 # A project file's inventory stands in for the PC-Link's.
@@ -114,6 +117,8 @@ class DiscoveryRunner:
             hub.apply_write_guard()
             hub.notify()
         self._set(IDLE, progress=100)
+        if module is None:
+            hub.hass.data.setdefault(DATA_LINKS_TRIED, set()).add(hub.entry.entry_id)
         hub.hass.config_entries.async_schedule_reload(hub.entry.entry_id)
 
     async def _async_inventory(self) -> None:
@@ -156,9 +161,16 @@ class DiscoveryRunner:
         """Keep the scenes the scan classified, report unreadable link tables, and save."""
         hub = self._hub
         self._set(FINALIZING, progress=_FINALIZING_FROM)
-        hub.inventory.scenes = (
-            dict(self._scenes) if module is None else self._scenes_after(module, hub.inventory.scenes)
-        )
+        if module is not None:
+            hub.inventory.scenes = self._scenes_after(module, hub.inventory.scenes)
+        else:
+            marks = hub.inventory.links_read_marks()
+            unread = {
+                output.address
+                for output in hub.inventory.output_modules()
+                if marks.get(output.address) in (None, self._read_before.get(output.address))
+            }
+            hub.inventory.scenes = self._scenes_keeping(unread, hub.inventory.scenes)
         scanned = [module] if module else sorted(hub.inventory.addresses())
         for address in scanned:
             issue_id = f"{ISSUE_CORRUPT_LINKS}_{address.lower()}"
@@ -199,6 +211,28 @@ class DiscoveryRunner:
             outputs = [*elsewhere, *((fresh.get(address) or {}).get("outputs") or [])]
             if outputs:
                 scenes[address] = {**(fresh.get(address) or kept[address]), "outputs": outputs}
+        return scenes
+
+    def _scenes_keeping(self, unread: set[str], known: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        """The scenes after a full run that could not read every module.
+
+        A run ends as finished when the line dropped or a module stayed
+        silent. What it classified stands; of what was known, the scenes
+        on keys and the members on the modules it did not read are kept.
+        """
+        scenes = dict(self._scenes)
+        if not unread:
+            return scenes
+        for address, scene in known.items():
+            if is_button_backed_cf(scene):
+                scenes.setdefault(address, scene)
+                continue
+            kept = [o for o in scene.get("outputs") or [] if str(o.get("module_address") or "").upper() in unread]
+            if not kept:
+                continue
+            fresh = scenes.get(address) or {}
+            read = [o for o in fresh.get("outputs") or [] if str(o.get("module_address") or "").upper() not in unread]
+            scenes[address] = {**(fresh or scene), "outputs": [*kept, *read]}
         return scenes
 
     def _set(self, phase: str, *, progress: int = 0, error: str | None = None) -> None:

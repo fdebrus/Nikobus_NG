@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import Platform
+from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
@@ -217,6 +218,24 @@ class ChannelEntity(NikobusEntity):
     def _value(self) -> int | None:
         """The output's byte; ``None`` until its group was heard."""
         return self.hub.value(self._address, self._channel)
+
+
+class DimmedEntity(ChannelEntity):
+    """A dimmed output, switched on at the level it last had."""
+
+    _last_level: int | None = None
+
+    @callback
+    def async_write_ha_state(self) -> None:
+        """Remember the level while the output is on."""
+        if value := self._value:
+            self._last_level = value
+        super().async_write_ha_state()
+
+    @property
+    def _level_to_turn_on(self) -> int:
+        """The last level seen since Home Assistant started, else full."""
+        return self._last_level or 0xFF
 
 
 class OnOffEntity(ChannelEntity):

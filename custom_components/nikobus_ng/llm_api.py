@@ -85,8 +85,14 @@ def _key(hub: NikobusHub, args: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _press(hub: NikobusHub, args: dict[str, Any]) -> dict[str, Any]:
-    await hub.async_press(args["address"])
-    return {"pressed": args["address"].upper()}
+    address = args["address"].upper()
+    if hub.inventory.key_of(address) is None:
+        # A model can invent an address, or give a plate's instead of a key's.
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="llm_not_a_key", translation_placeholders={"address": address}
+        )
+    await hub.async_press(address)
+    return {"pressed": address}
 
 
 _SPECS = (
@@ -158,7 +164,7 @@ _SPECS = (
             {
                 probatio.Required(
                     "address", description="The key's six-digit hexadecimal address."
-                ): probatio.All(str, probatio.Match(r"^[0-9A-Fa-f]{6}$"))
+                ): probatio.All(str, probatio.Match(r"^[0-9A-Fa-f]{6}\Z"))
             }
         ),
         _PRESS,

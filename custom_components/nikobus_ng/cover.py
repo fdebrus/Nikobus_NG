@@ -287,6 +287,7 @@ class NikobusShutterGroup(NikobusEntity, CoverEntity):
         self._member_ids = [f"{module}_{channel}" for module, channel in members]
         self._bus_address = str(record.get("bus_address") or address).upper()
         self._members: list[str] = []
+        self._untrack_members: CALLBACK_TYPE | None = None
         self._attr_unique_id = f"{address}_group"
         # The key the icon is found under; the name is the device's.
         self._attr_translation_key = "shutter_group"
@@ -297,15 +298,37 @@ class NikobusShutterGroup(NikobusEntity, CoverEntity):
 
     async def async_added_to_hass(self) -> None:
         """Find the members that are shutters here, and follow them."""
+        self._follow_members()
+        self.async_on_remove(self._unfollow_members)
+        self.async_on_remove(
+            self.hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, self._on_registry_update)
+        )
+
+    @callback
+    def _follow_members(self) -> None:
         registry = er.async_get(self.hass)
+        self._unfollow_members()
         self._members = [
             entity_id
             for unique_id in self._member_ids
             if (entity_id := registry.async_get_entity_id(Platform.COVER, DOMAIN, unique_id))
         ]
-        self.async_on_remove(
-            async_track_state_change_event(self.hass, self._members, self._on_member_change)
+        self._untrack_members = async_track_state_change_event(
+            self.hass, self._members, self._on_member_change
         )
+
+    @callback
+    def _unfollow_members(self) -> None:
+        if self._untrack_members is not None:
+            self._untrack_members()
+            self._untrack_members = None
+
+    @callback
+    def _on_registry_update(self, event: Event[er.EventEntityRegistryUpdatedData]) -> None:
+        """A member that changes its entity id, as a take-over does, is followed under the new one."""
+        if event.data.get("old_entity_id") in self._members:
+            self._follow_members()
+            self.async_write_ha_state()
 
     @callback
     def _on_member_change(self, _event: Event[EventStateChangedData]) -> None:

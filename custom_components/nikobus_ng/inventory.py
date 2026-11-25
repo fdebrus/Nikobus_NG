@@ -439,7 +439,8 @@ class Inventory:
 
     def steady_groups(self) -> set[tuple[str, int]]:
         """The groups nothing but a key telegram changes (see the library)."""
-        return steady_groups(self.buttons, self.modules)
+        # As the options type them: a module they call a dimmer or a roller is never steady.
+        return steady_groups(self.buttons, {"nikobus_module": self._module_entries()})
 
     # --- keys ---------------------------------------------------------------
 
@@ -631,6 +632,14 @@ class Inventory:
         if self._linked is None:
             self._linked = {(module, channel) for module, channel, _ in self._links()}
         return (address.upper(), channel) in self._linked
+
+    def links_read_marks(self) -> dict[str, str]:
+        """When each output module's link table was last read in full."""
+        return {
+            module.address: str(mark)
+            for module in self.output_modules()
+            if (mark := self._module_entries()[module.address].get("links_read_at"))
+        }
 
     def links_read(self, address: str) -> bool:
         """Whether the module's own link table was read in full."""

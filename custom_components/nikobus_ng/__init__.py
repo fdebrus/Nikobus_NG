@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
-from .const import CONF_LABELS, DOMAIN, PLATFORMS
+from .const import CONF_LABELS, DATA_LINKS_TRIED, DOMAIN, PLATFORMS
 from .entity import gateway_device
 from .hub import NikobusHub
 from .inventory import Inventory
 from .labels import apply_labels
 from .llm_api import async_register_llm_api
 from .services import async_setup_services
-from .takeover import apply_pending, repair_taken
+from .takeover import apply_pending, give_back, repair_taken
 
 type NikobusConfigEntry = ConfigEntry[NikobusHub]
 
@@ -41,10 +41,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: NikobusConfigEntry) -> b
     hub.register_system_modules()
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        entry.async_on_unload(async_register_llm_api(hass, hub))
+        await _async_after_platforms(hass, entry, hub)
     except BaseException:
+        # The port is ours until the hub is stopped; a later setup could not open it.
         await hub.async_stop()
         raise
-    entry.async_on_unload(async_register_llm_api(hass, hub))
+    return True
+
+
+async def _async_after_platforms(hass: HomeAssistant, entry: NikobusConfigEntry, hub: NikobusHub) -> None:
+    """Finish a take-over, then read from the bus what is not known yet."""
     inventory = hub.inventory
     if inventory.takeover["pending"]:
         apply_pending(hass, hub)
@@ -55,15 +62,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: NikobusConfigEntry) -> b
     if inventory.is_empty:
         # Nothing is known yet: read the installation, then reload.
         hub.discovery.start()
-        return True
+        return
     _remove_devices_no_longer_known(hass, entry, hub)
     if inventory.from_project and not any(inventory.links_read(m.address) for m in inventory.output_modules()):
         # A project file named the modules; which key drives what is still in them.
-        hub.discovery.start()
+        # Once per start: a discovery ends in a reload, and one that read no module would start the next.
+        if entry.entry_id not in hass.data.get(DATA_LINKS_TRIED, ()):
+            hub.discovery.start()
     elif retyped := inventory.types_to_read_again():
         # A module the options gave another type: its links are decoded by type.
         hub.discovery.start(retyped[0])
-    return True
 
 
 def _remove_devices_no_longer_known(hass: HomeAssistant, entry: NikobusConfigEntry, hub: NikobusHub) -> None:
@@ -87,6 +95,9 @@ async def async_remove_config_entry_device(
     addresses = [identifier for domain, identifier in device.identifiers if domain == DOMAIN]
     if any(address.startswith(entry.entry_id) or address.endswith(("_scene", "_group")) for address in addresses):
         return False
+    if entry.state is not ConfigEntryState.LOADED:
+        # Forgetting an address needs the stores, which a loaded entry holds.
+        return False
     for address in addresses:
         await entry.runtime_data.async_forget(address)
     return True
@@ -100,6 +111,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: NikobusConfigEntry) -> 
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: NikobusConfigEntry) -> None:
-    """Delete what discovery stored for the entry."""
-    await Inventory(hass, entry.entry_id).async_remove()
+    """Give back what was taken over, then delete what discovery stored for the entry."""
+    inventory = Inventory(hass, entry.entry_id)
+    await inventory.async_load()
+    if inventory.takeover["done"]:
+        # The parked Nikobus entities would otherwise keep their parked ids for good.
+        give_back(hass, inventory)
+    await inventory.async_remove()
 

@@ -49,6 +49,7 @@ from .const import (
     CONF_ON_KEY,
     CONF_PRESS_REPEAT,
     CONF_SHUTTERS,
+    COVER_CLOSING,
     COVER_OPENING,
     COVER_STOPPED,
     DEFAULT_PRESS_REPEAT,
@@ -61,12 +62,14 @@ from .const import (
     ISSUE_NO_DEVICE,
     ISSUE_NOT_ANSWERING,
     MANUFACTURER,
+    MODULE_ISSUES,
     POLL_INTERVAL,
     RECONNECT_DELAY_INITIAL,
     RECONNECT_DELAY_MAX,
     RELEASE_READ_DELAY,
     REPROGRAMMED_CHECK_DELAY,
     REPROGRAMMED_CHECK_INTERVAL,
+    ROLLER_MODULE,
     SILENT_READS,
     SILENT_RETRY,
     SWITCH_MODULE,
@@ -80,6 +83,17 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _being_cancelled() -> bool:
+    """Whether this task itself is being cancelled.
+
+    The library cancels the answer a command waits for when the line
+    drops or the handler restarts. That reaches the caller as the same
+    exception as its own cancellation, and is a failed command.
+    """
+    task = asyncio.current_task()
+    return task is not None and task.cancelling() > 0
 
 
 class NikobusHub:
@@ -383,10 +397,17 @@ class NikobusHub:
 
     async def async_read_group(self, address: str, group: int) -> bool:
         """Read one output group from its module. ``False`` when it did not answer."""
+        if self.old_pc_link:
+            # Such a PC-Link answers no state read: each one would hold the line until it timed out.
+            return False
         try:
             state = await self.command.get_output_state(address, group)
         except (NikobusError, TimeoutError) as err:
             _LOGGER.debug("Module %s group %d did not answer: %s", address, group, err)
+            return False
+        except asyncio.CancelledError:
+            if _being_cancelled():
+                raise
             return False
         if not state:
             return False
@@ -428,6 +449,9 @@ class NikobusHub:
         key = keys.get(CONF_ON_KEY if towards_on else CONF_OFF_KEY)
         if not key:
             return False
+        if module_type == ROLLER_MODULE and value == COVER_STOPPED and before not in (COVER_OPENING, COVER_CLOSING):
+            # Nothing runs: the key that stops a move would start one.
+            return False
         api = self.api
         self.note_press(key)
         try:
@@ -467,13 +491,15 @@ class NikobusHub:
             # The buffer holds the new value from here on.
             self.notify(address)
             await written
-        except (NikobusError, TimeoutError) as err:
+        except (NikobusError, TimeoutError, asyncio.CancelledError) as err:
+            if isinstance(err, asyncio.CancelledError) and _being_cancelled():
+                raise
             # The buffer may now hold a value the module never took.
             self.hass.async_create_task(self.async_read_group(address, group))
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="command_failed",
-                translation_placeholders={"address": address, "error": str(err)},
+                translation_placeholders={"address": address, "error": str(err) or "the connection was lost"},
             ) from err
         # The module holds exactly the frame it acknowledged, and the library
         # may have read the group first: the other outputs can have moved.
@@ -678,7 +704,8 @@ class NikobusHub:
             del self._heard[key]
         self._silent.pop(address, None)
         self._silent_until.pop(address, None)
-        ir.async_delete_issue(self.hass, DOMAIN, f"{ISSUE_NOT_ANSWERING}_{address.lower()}")
+        for issue in MODULE_ISSUES:
+            ir.async_delete_issue(self.hass, DOMAIN, f"{issue}_{address.lower()}")
         self.apply_write_guard()
 
     async def _async_connection_lost(self) -> None:
@@ -717,6 +744,10 @@ class NikobusHub:
         self._heard.clear()
         self.connected = True
         self._note_probe()
+        if self.old_pc_link:
+            # Nothing can be read back: what was last written is what is known.
+            self._restore_states()
         self.notify()
         _LOGGER.info("Reconnected to the Nikobus gateway")
-        await self._async_poll()
+        if not self.old_pc_link:
+            await self._async_poll()

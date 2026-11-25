@@ -13,7 +13,7 @@ from homeassistant.core import (
     SupportsResponse,
     callback,
 )
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.service import async_register_admin_service
 
@@ -31,8 +31,8 @@ SERVICE_BACKUP = "backup_programming"
 SERVICE_DISCOVER = "discover"
 SERVICE_DESCRIBE = "describe"
 
-_KEY_ADDRESS = vol.All(cv.string, vol.Upper, vol.Match(r"^[0-9A-F]{6}$"))
-_MODULE_ADDRESS = vol.All(cv.string, vol.Upper, vol.Match(r"^[0-9A-F]{4}$"))
+_KEY_ADDRESS = vol.All(cv.string, vol.Upper, vol.Match(r"^[0-9A-F]{6}\Z"))
+_MODULE_ADDRESS = vol.All(cv.string, vol.Upper, vol.Match(r"^[0-9A-F]{4}\Z"))
 _MODULES = vol.Schema({vol.Optional(ATTR_MODULES): vol.All(cv.ensure_list, [_MODULE_ADDRESS])})
 
 
@@ -62,8 +62,15 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_key="unknown_module",
                 translation_placeholders={"address": str(wanted)},
             )
-        for address, group in groups:
-            await hub.async_read_group(address, group)
+        if not hub.connected:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="not_connected")
+        silent = sorted({address for address, group in groups if not await hub.async_read_group(address, group)})
+        if silent:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="module_did_not_answer",
+                translation_placeholders={"modules": ", ".join(silent)},
+            )
 
     async def verify(call: ServiceCall) -> ServiceResponse:
         report: dict[str, Any] = await _hub(hass).maintenance.async_verify(call.data.get(ATTR_MODULES))

@@ -49,6 +49,7 @@ from .manual import led_keys_of, run_times_of
 
 if TYPE_CHECKING:
     from .hub import NikobusHub
+    from .inventory import Inventory
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -182,6 +183,27 @@ def _carried_name(old: er.RegistryEntry, mine: er.RegistryEntry | None, shown: s
     return part if part and mine is not None and part != mine.original_name else None
 
 
+def _area_to_the_device(
+    devices: dr.DeviceRegistry, entry: er.RegistryEntry, changes: dict[str, Any]
+) -> None:
+    """Give the area to the device when the entity has no name of its own.
+
+    Such an entity stands for its device, and the registry refuses it
+    an area of its own (an error from Home Assistant 2026.11): a light
+    scene, a shutter group, a colour controller.
+    """
+    area = changes.get("area_id", entry.area_id)
+    if changes.get("name", entry.name) or entry.original_name or area is None or entry.device_id is None:
+        return
+    device = devices.async_get(entry.device_id)
+    if device is not None and device.area_id is None:
+        devices.async_update_device(device.id, area_id=area)
+    changes["area_id"] = None
+
+
+_COUNTERPART_DOMAINS = ("light", "switch", "cover", "fan", "scene", "event", "button")
+
+
 def _used(old: er.RegistryEntry) -> bool:
     """Whether the Nikobus entity was in use: enabled, or disabled only because its entry is."""
     return old.disabled_by in (None, er.RegistryEntryDisabler.CONFIG_ENTRY)
@@ -197,7 +219,8 @@ def make_plan(hass: HomeAssistant, hub: NikobusHub) -> Plan:
     shutters = {output: dict(settings) for output, settings in hub.shutters.items()}
     plan = Plan()
     taken = {(item["domain"], item["unique_id"]) for item in inventory.takeover["done"]}
-    for entry in sorted(er.async_get(hass).entities.values(), key=lambda e: e.entity_id):
+    registry = er.async_get(hass)
+    for entry in sorted(registry.entities.values(), key=lambda e: e.entity_id):
         if entry.platform != OLD_DOMAIN:
             continue
         target: tuple[str, str] | None = None
@@ -225,7 +248,10 @@ def make_plan(hass: HomeAssistant, hub: NikobusHub) -> Plan:
                 if match := pattern.match(entry.unique_id):
                     target = (domain, unique_id.format(match[1].upper()))
                     break
-        if target is None:
+        # An output changes kind with the options, so its counterpart may be of another kind for now.
+        if target is None or not any(
+            registry.async_get_entity_id(domain, DOMAIN, target[1]) for domain in _COUNTERPART_DOMAINS
+        ):
             plan.left += 1
             continue
         if target in taken:
@@ -269,8 +295,6 @@ def apply_pending(hass: HomeAssistant, hub: NikobusHub) -> int:
             continue
         mine = registry.async_get(mine_id)
         device = devices.async_get(old.device_id) if old.device_id else None
-        if parked:
-            registry.async_update_entity(old.entity_id, new_entity_id=parked)
         changes: dict[str, Any] = {
             "name": _carried_name(old, mine, item["name"]),
             "area_id": old.area_id or (device.area_id if device else None),
@@ -284,7 +308,18 @@ def apply_pending(hass: HomeAssistant, hub: NikobusHub) -> int:
         if _used(old) and mine and mine.disabled_by is er.RegistryEntryDisabler.INTEGRATION:
             # Used there, so wanted here, whatever the links say.
             changes["disabled_by"] = None
-        registry.async_update_entity(mine_id, **changes)
+        if mine is not None:
+            _area_to_the_device(devices, mine, changes)
+        # The registry refuses an id that has a state or is reserved: one refusal must not lose the others.
+        try:
+            if parked:
+                registry.async_update_entity(old.entity_id, new_entity_id=parked)
+            registry.async_update_entity(mine_id, **changes)
+        except ValueError as err:
+            if parked and registry.async_get(parked) and registry.async_get(item["entity_id"]) is None:
+                registry.async_update_entity(parked, new_entity_id=item["entity_id"])
+            _LOGGER.warning("%s was not taken over: %s", item["entity_id"], err)
+            continue
         for domain, options in old.options.items():
             registry.async_update_entity_options(taken, domain, dict(options))
         inventory.takeover["done"].append(
@@ -302,6 +337,7 @@ def repair_taken(hass: HomeAssistant, hub: NikobusHub) -> int:
     disabled here. A name changed since by a person is left alone.
     """
     registry = er.async_get(hass)
+    devices = dr.async_get(hass)
     repaired = 0
     for item in hub.inventory.takeover["done"]:
         mine_id = registry.async_get_entity_id(item["domain"], DOMAIN, item["unique_id"])
@@ -315,32 +351,49 @@ def repair_taken(hass: HomeAssistant, hub: NikobusHub) -> int:
             changes["name"] = name
         if _used(old) and mine.disabled_by is er.RegistryEntryDisabler.INTEGRATION:
             changes["disabled_by"] = None
-        if changes:
+        if not changes:
+            continue
+        _area_to_the_device(devices, mine, changes)
+        try:
             registry.async_update_entity(mine.entity_id, **changes)
-            repaired += 1
+        except ValueError as err:
+            _LOGGER.warning("%s was left as it is: %s", mine.entity_id, err)
+            continue
+        repaired += 1
     return repaired
 
 
-def give_back(hass: HomeAssistant, hub: NikobusHub) -> int:
-    """Undo a take-over: each entity gets the id it had before. Returns how many were given back."""
-    inventory = hub.inventory
+def give_back(hass: HomeAssistant, inventory: Inventory) -> int:
+    """Undo a take-over: each entity gets the id it had before. Returns how many were given back.
+
+    What the registry refuses to move stays recorded, to be given back later.
+    """
     registry = er.async_get(hass)
     given = 0
+    kept: list[dict[str, str]] = []
     for item in reversed(inventory.takeover["done"]):
         taken = item.get("taken_entity_id", item["entity_id"])
         mine_id = registry.async_get_entity_id(item["domain"], DOMAIN, item["unique_id"])
-        if mine_id == taken and taken != item["previous_entity_id"]:
-            free = registry.async_get(item["previous_entity_id"]) is None
-            registry.async_update_entity(
-                mine_id, new_entity_id=item["previous_entity_id"] if free else f"{taken}_ng"
-            )
-        if item["parked"] is None:
-            # A key: the Nikobus entity never left its id.
-            given += 1
-            continue
-        parked = registry.async_get(item["parked"])
-        if parked is not None and parked.platform == OLD_DOMAIN and registry.async_get(item["entity_id"]) is None:
-            registry.async_update_entity(item["parked"], new_entity_id=item["entity_id"])
-            given += 1
-    inventory.takeover = {"pending": [], "done": []}
+        try:
+            if mine_id == taken and taken != item["previous_entity_id"]:
+                free = registry.async_get(item["previous_entity_id"]) is None
+                registry.async_update_entity(
+                    mine_id, new_entity_id=item["previous_entity_id"] if free else f"{taken}_ng"
+                )
+            if item["parked"] is None:
+                # A key: the Nikobus entity never left its id.
+                given += 1
+                continue
+            parked = registry.async_get(item["parked"])
+            if (
+                parked is not None
+                and parked.platform == OLD_DOMAIN
+                and registry.async_get(item["entity_id"]) is None
+            ):
+                registry.async_update_entity(item["parked"], new_entity_id=item["entity_id"])
+                given += 1
+        except ValueError as err:
+            _LOGGER.warning("%s was not given back: %s", item["entity_id"], err)
+            kept.insert(0, item)
+    inventory.takeover = {"pending": [], "done": kept}
     return given

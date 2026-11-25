@@ -237,6 +237,13 @@ class NikobusOptionsFlow(OptionsFlowWithReload):
     def _save(self, **changes: Any) -> ConfigFlowResult:
         return self.async_create_entry(data={**self.config_entry.options, **changes})
 
+    def _save_and_reload(self, **changes: Any) -> ConfigFlowResult:
+        """Save, and reload once: changed options reload the entry by themselves."""
+        options = {**self.config_entry.options, **changes}
+        if options == dict(self.config_entry.options):
+            self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
+        return self.async_create_entry(data=options)
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Offer what this installation has."""
         if self.config_entry.state is not ConfigEntryState.LOADED:
@@ -250,7 +257,8 @@ class NikobusOptionsFlow(OptionsFlowWithReload):
         if _output_options(inventory, *OUTPUT_MODULE_TYPES):
             steps.append("led_key")
         steps.append("gateway")
-        if inventory.addresses():
+        retyped = self.config_entry.options.get(CONF_MODULE_TYPES, {})
+        if retyped or any(inventory.inventoried_type(a) in MODULE_CHANNELS for a in inventory.addresses()):
             steps.append("module_type")
         if inventory.is_empty or inventory.from_project:
             steps.append("files")
@@ -344,16 +352,15 @@ class NikobusOptionsFlow(OptionsFlowWithReload):
                     _read_files, self.hass, user_input[CONF_MODULE_FILE], user_input[CONF_BUTTON_FILE]
                 )
                 config, names, options = inventory_from_files(modules, buttons)
-            except (ValueError, KeyError, TypeError, FileNotFoundError):
-                errors["base"] = "invalid_files"
-            else:
                 inventory = self._inventory()
                 inventory.use_project(config)
+            except (ValueError, KeyError, TypeError, AttributeError, FileNotFoundError):
+                errors["base"] = "invalid_files"
+            else:
                 inventory.names = {**inventory.names, **names}
                 await inventory.async_save()
                 # The links are read from the modules once the entry has reloaded.
-                self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
-                return self._save(**options)
+                return self._save_and_reload(**options)
         accept = FileSelectorConfig(accept=".json")
         schema = vol.Schema(
             {
@@ -543,8 +550,7 @@ class NikobusOptionsFlow(OptionsFlowWithReload):
             inventory.takeover["pending"] = plan.entities
             await inventory.async_save()
             # The ids move when the entry has reloaded, whether or not an option changed.
-            self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
-            return self._save(**merged_options(plan, settings, hub))
+            return self._save_and_reload(**merged_options(plan, settings, hub))
         now_lights = set(hub.light_outputs)
         return self.async_show_form(
             step_id="take_over",
@@ -562,7 +568,7 @@ class NikobusOptionsFlow(OptionsFlowWithReload):
         """Undo a take-over: every entity gets back the id it had before."""
         inventory = self._inventory()
         if user_input is not None:
-            give_back(self.hass, self.config_entry.runtime_data)
+            give_back(self.hass, inventory)
             await inventory.async_save()
             self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
             return self._save()
@@ -581,7 +587,9 @@ class NikobusOptionsFlow(OptionsFlowWithReload):
         errors: dict[str, str] = {}
         if user_input is not None:
             as_inventory = offer_inventory and user_input.get(CONF_USE_AS_INVENTORY, False)
-            if as_inventory and (hub.busy or not hub.connected):
+            if as_inventory and not hub.connected:
+                return self.async_abort(reason="not_connected")
+            if as_inventory and hub.busy:
                 # Checked before the inventory is replaced: the link scan must be able to start.
                 return self.async_abort(reason="bus_taken")
             try:

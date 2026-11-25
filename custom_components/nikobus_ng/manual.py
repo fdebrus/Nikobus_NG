@@ -8,6 +8,7 @@ per output that are settings there and options here.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from nikobus_connect.nkb import NkbConfig
@@ -38,7 +39,7 @@ def _seconds(value: Any) -> float | None:
         seconds = float(str(value).replace(",", "."))
     except ValueError:
         return None
-    return seconds if seconds > 0 else None
+    return seconds if math.isfinite(seconds) and seconds > 0 else None
 
 
 def led_keys_of(channel: dict[str, Any]) -> dict[str, str]:

@@ -114,6 +114,16 @@ ISSUE_CORRUPT_LINKS: Final = "module_corrupt_links"
 ISSUE_NO_DEVICE: Final = "no_device_answered"
 ISSUE_FEEDBACK_PORT: Final = "feedback_module_port"
 ISSUE_TYPE_FIXABLE: Final = "module_type_fixable"
+#: Every repair filed under a module's address, to withdraw when the module is forgotten.
+MODULE_ISSUES: Final = (
+    ISSUE_NOT_ANSWERING,
+    ISSUE_CORRUPT_LINKS,
+    ISSUE_TYPE_FIXABLE,
+    "module_memory_error",
+    "module_checksum_mismatch",
+    "module_type_mismatch",
+    "module_reprogrammed",
+)
 #: This many pushed states with none of the queries behind them: the port is the Feedback Module's own.
 FEEDBACK_PORT_ANSWERS: Final = 6
 
@@ -128,3 +138,6 @@ GROUP_SHUTTER_GROUPS: Final = "shutter_groups"
 
 #: Fired for every key press seen on the bus, known key or not.
 EVENT_PRESS: Final = "nikobus_ng_press"
+
+#: The entries whose links were looked for at setup since Home Assistant started.
+DATA_LINKS_TRIED: Final = f"{DOMAIN}_links_tried"
