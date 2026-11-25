@@ -10,14 +10,15 @@ runs on the same protocol library,
 
 ```bash
 pip install -r requirements_test.txt   # Python 3.14; installs Home Assistant and nikobus-simulator
-python -m pytest -q                    # ~160 tests, 7 to 8 minutes, no hardware needed
+python -m pytest -q                    # ~180 tests, 9 to 10 minutes, no hardware needed
 ruff check .                           # must be clean; CI pins ruff 0.17.3
 ```
 
 The tests run against the real Home Assistant
 (`pytest-homeassistant-custom-component`) and `nikobus-simulator`, the
-simulated PC-Link shipped with the library. Nothing of Home Assistant or of
-the library is replaced.
+simulated PC-Link shipped with the library. The connection, the bus and the
+modules are never faked; what the simulator lacks is answered by the test,
+which says so.
 
 ## Layout
 
@@ -58,9 +59,10 @@ the library is replaced.
 
 - Test the real behaviour. The simulator has no inventory, no checksum, no
   clock and no colour controller: a test that fakes one of those says so.
-- The test harness pins a Home Assistant release, and may be behind the one
-  users run. Behaviour that differs between releases (entity naming changed
-  in 2026.11) is checked against the newer source and marked as such.
+- The test harness (`pytest-homeassistant-custom-component`) brings its own
+  Home Assistant release, which may be behind the one users run. Behaviour
+  that differs between releases (entity naming changed in 2026.11) is checked
+  against the newer source and marked as such.
 - A test must not end while a reload or the first reads are in flight: wait
   for the new hub (`_reloaded` in `tests/test_remaining.py`).
 - Every bug fix gets a test that fails without the fix.
@@ -70,7 +72,8 @@ the library is replaced.
 ## Releases
 
 - The library comes first: release it, publish it to PyPI, then raise
-  `nikobus-connect>=` in `manifest.json` and `requirements_test.txt`.
+  `nikobus-connect>=` in `manifest.json` and `requirements_test.txt`, and the
+  simulator's tag in `requirements_test.txt`.
 - Bump `version` in `manifest.json`. `hacs.json` holds the minimum Home
   Assistant version.
 - A release is a GitHub release with a version tag; HACS offers those.

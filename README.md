@@ -200,7 +200,7 @@ How the two differ:
 | Keys | binary sensors and up to seven kinds of bus event | `event` entities, one bus event |
 | Relay as light, dimmer as fan | module customisation | two tick lists |
 | Outputs without a name | no entity | an entity, disabled when no key drives it |
-| Gone modules and plates | detect, then purge | a repair; or delete the device |
+| Gone modules and plates | detect, then purge | a repair for a module; delete the device of either |
 | Scenes made in the options | yes | no: use Home Assistant's own scenes |
 | Refresh interval | adjustable | fixed |
 | Tests | against a stub of Home Assistant | against the real core and a simulated bus |
@@ -237,7 +237,7 @@ What the PC-Link inventory and the link scan recognise comes from the library an
 
 ## What is verified
 
-Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, the simulated PC-Link shipped with the library. Nothing of Home Assistant or of the library is replaced in the tests.
+Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, the simulated PC-Link shipped with the library. The connection, the bus and the modules are never faked: what the simulator lacks (a module's checksum, the PC-Link's clock) is answered by the test, which says so, and a few timing constants are shortened.
 
 **Seen on the one real installation** (a serial PC-Link, six output modules, a Feedback Module, 44 plates; Home Assistant 2026.11):
 
@@ -247,19 +247,19 @@ Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, th
 - The PC-Link's clock read, and set: from 47 minutes ahead to one second.
 - The description: 52 outputs, 154 keys, 4 scenes, 6 logical inputs.
 - A module the PC-Link lists but that is not on the bus: reported, and kept out once its device was deleted.
-- A take-over of 45 outputs, 3 scenes, 6 input switches and 152 keys with their press buttons.
+- A take-over of 45 outputs, 3 scenes, 6 input switches and 152 keys with their press buttons, with the shutter run times set in Nikobus.
+- A key pressed and held at the wall: pressed, held, and released after a short and a long press, as events of its entity (2026-11-13).
 - Devices filed by kind under the bridge.
 
 **Not yet seen on real hardware:**
 
-- A key pressed or held at the wall, as events in Nikobus NG.
 - Switching an output and moving a shutter from Home Assistant, observed end to end.
 - LED keys with a Feedback Module.
 - An audio module, an RGB controller, a motion detector, a Modular Interface.
 - An installation without a PC-Link, and a PC-Link older than generation 3.
 - A module's checksum check and memory backup.
 - The AI tools used by a real conversation agent.
-- The take-over's import of LED keys and shutter run times from a real Nikobus store.
+- The take-over's import of LED keys from a real Nikobus store (that installation had none).
 
 **Limits of the tests themselves:**
 
@@ -292,7 +292,7 @@ ruff check .
 
 The code is in `custom_components/nikobus_ng/`: `hub.py` (connection, state, commands), `inventory.py` (the one store), `discovery.py`, `config_flow.py`, one file per platform, `maintenance.py`, `describe.py` and `llm_api.py` (the wiring as data), `takeover.py`. [`CLAUDE.md`](CLAUDE.md) holds the rules the project is developed under.
 
-The design started from a [review of the Nikobus integration](https://github.com/fdebrus/Nikobus-HA/blob/main/documentation/nikobus-ng-review.md). Nikobus NG is about 5 900 lines of Python against 15 000 there.
+The design started from a [review of the Nikobus integration](https://github.com/fdebrus/Nikobus-HA/blob/main/documentation/nikobus-ng-review.md). Nikobus NG is about 6 300 lines of Python against 15 000 there.
 
 ---
 

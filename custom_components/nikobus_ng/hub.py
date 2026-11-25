@@ -148,7 +148,6 @@ class NikobusHub:
         self.inventory_query_type: InventoryQueryType | None = None
         self.nikobus_command: NikobusCommandHandler | None = None
 
-    # --- the library's host protocol -------------------------------------------
 
     @property
     def dict_module_data(self) -> dict[str, Any]:
@@ -167,7 +166,6 @@ class NikobusHub:
         """The number of keys of a plate address."""
         return self.inventory.plate_channels(button_address)
 
-    # --- lifecycle ---------------------------------------------------------------
 
     async def async_start(self) -> None:
         """Connect and start listening. Raises ``ConfigEntryNotReady``."""
@@ -285,7 +283,6 @@ class NikobusHub:
             except NikobusError as err:
                 _LOGGER.debug("While stopping: %s", err)
 
-    # --- output state ------------------------------------------------------------
 
     def allocate_states(self) -> None:
         """Give every output module a buffer of its own size."""
@@ -509,7 +506,6 @@ class NikobusHub:
             self.inventory.schedule_save()
         self.notify(address)
 
-    # --- presses -----------------------------------------------------------------
 
     @callback
     def note_press(self, bus_address: str) -> None:
@@ -546,7 +542,6 @@ class NikobusHub:
                 translation_placeholders={"address": bus_address, "error": str(err)},
             ) from err
 
-    # --- frames ------------------------------------------------------------------
 
     async def _async_on_frame(self, message: str) -> None:
         """Route what is neither an acknowledgement nor an output state."""
@@ -616,7 +611,6 @@ class NikobusHub:
         self._apply(address, group, state)
         self.command.resolve_pending_get(address, group, state)
 
-    # --- keeping up --------------------------------------------------------------
 
     @property
     def busy(self) -> bool:

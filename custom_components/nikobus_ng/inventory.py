@@ -442,7 +442,6 @@ class Inventory:
         # As the options type them: a module they call a dimmer or a roller is never steady.
         return steady_groups(self.buttons, {"nikobus_module": self._module_entries()})
 
-    # --- keys ---------------------------------------------------------------
 
     def plate_channels(self, address: str) -> int | None:
         """How many keys a plate has, for the library's decoders."""
@@ -666,7 +665,6 @@ class Inventory:
                 best = seconds
         return best
 
-    # --- names from a project file ------------------------------------------
 
     def channel_name(self, address: str, channel: int) -> str | None:
         """The name the project file gives an output."""

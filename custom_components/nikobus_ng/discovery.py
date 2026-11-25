@@ -239,7 +239,6 @@ class DiscoveryRunner:
         self.status = DiscoveryStatus(phase=phase, progress=progress, error=error)
         self._hub.notify()
 
-    # --- what the library reports -------------------------------------------------
 
     def on_progress(self, progress: Any) -> None:
         """Turn the library's counters into one percentage."""
