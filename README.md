@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-# Nikobus NG for Home Assistant
+# for Home Assistant
 
 <p align="left">
   <a href="https://www.buymeacoffee.com/fdebrus"><img src="https://img.shields.io/badge/Support-Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buymeacoffee" alt="Buy Me a Coffee"></a>
