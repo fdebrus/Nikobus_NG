@@ -1,3 +1,10 @@
+<p align="left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="custom_components/nikobus_ng/brand/dark_logo@2x.png">
+    <img src="custom_components/nikobus_ng/brand/logo@2x.png" alt="Nikobus NG" width="420">
+  </picture>
+</p>
+
 # Nikobus NG for Home Assistant
 
 <p align="left">
