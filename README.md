@@ -99,7 +99,7 @@ To change the connection itself, use **Reconfigure** on the entry.
 |---|---|
 | Switch module output | `switch`, or `light` when ticked as switching a lamp |
 | Dimmer output | `light` with brightness, or `fan` with speed |
-| Roller output | `cover` with a position estimated from its run times |
+| Roller output | `cover` with a position estimated from its run times, unknown until it has run to an end once |
 | Light scene (central function) | `scene`, activated by its own telegram |
 | Function that only moves shutters | `cover` for the group |
 | Each key of a plate, remote or interface | `event` entity, and a press `button` (created disabled) |
@@ -146,7 +146,9 @@ A blueprint, [`nikobus_ng_key_controls_entity.yaml`](blueprints/automation/fdebr
 Home Assistant shows an entity and its state. It cannot show the wiring: which key drives which output, in which mode, for how long. Nikobus NG returns it as data.
 
 - **The `nikobus_ng.describe` action** returns the whole installation: every output with the keys that drive it, every key with what it drives, the scenes with their outputs, the health of the bus.
-- **An LLM API, "Nikobus NG"**, offers the same in pieces to Home Assistant's conversation agents and its MCP server: `nikobus_overview`, `nikobus_output`, `nikobus_key`, `nikobus_scenes`, `nikobus_health`, and `nikobus_press_key`. The first five only read.
+- **An LLM API, "Nikobus NG"**, offers the same in pieces to Home Assistant's conversation agents and its MCP server: `nikobus_overview`, `nikobus_output`, `nikobus_key`, `nikobus_scenes`, `nikobus_health`, and `nikobus_press_key`. The first five only read. Most describe a part of it; the full list of keys and the logical inputs are in the action only.
+
+  **An assistant given these tools sees the whole installation**: every output, key and scene of Nikobus NG with its name, area and state, and it can press any known key. The tools do not follow the per-assistant *Expose* setting, since a key's links cross the house and a partial view could not explain them. Enabling the Nikobus NG tools for an assistant is the one switch that grants this.
 
 A link is said in words, with its values under what they are instead of the vendor's T1 and T2:
 
@@ -277,6 +279,8 @@ Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, th
 - **Names come from the `.nkb`.** The bus carries wiring, not labels.
 - **The RGB controller's colour and brightness cannot be set**, and an audio zone's volume level cannot be read: the bus offers neither.
 - **Calendar programs stay in the PC-Link.** A calendar channel that drives an output is named in `controlled_by`; its program is neither read nor fired.
+- **A shutter's position is unknown until it has run to an end once.** A module says which way the motor runs, never where the shutter is. Until then *open* and *close* run the whole travel, and a position cannot be asked for. The position is kept across restarts.
+- **A dimmer switched on without a level takes the last one seen since Home Assistant started**, and full after a restart.
 - **A press sent by Home Assistant is not echoed.** No event fires for it; the modules it drives are read instead.
 - **The refresh interval is fixed**: every two minutes, or every five for what a Feedback Module does not report.
 

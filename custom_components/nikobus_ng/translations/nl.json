@@ -523,6 +523,9 @@
     },
     "backup_nothing_read": {
       "message": "Geen enkele module kon worden gelezen; er is niets opgeslagen."
+    },
+    "position_unknown": {
+      "message": "De positie van dit rolluik is nog niet bekend. Open of sluit het één keer volledig; daarna kan het naar een positie worden gestuurd."
     }
   },
   "selector": {

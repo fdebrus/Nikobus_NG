@@ -4,16 +4,27 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from homeassistant.core import HomeAssistant
+import pytest
+from homeassistant.core import HomeAssistant, State
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 from nikobus_connect.travel import TravelCalculator
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant_custom_component.common import (
+    async_fire_time_changed,
+    mock_restore_cache,
+)
 
 from custom_components.nikobus_ng.cover import NikobusCover
 
 from .conftest import ROLLER, SetupFixture, WallSimulator, wait_for
 
 COVER = "cover.roller_shutter_module_9105_output_1"
+
+
+@pytest.fixture
+def kept_open(hass: HomeAssistant) -> None:
+    """The shutter was open when Home Assistant last stopped: its position is known."""
+    mock_restore_cache(hass, [State(COVER, "open", {"current_position": 100})])
 
 
 class _Clock:
@@ -40,6 +51,7 @@ async def _tick(hass: HomeAssistant, entity: NikobusCover) -> None:
     await hass.async_block_till_done()
 
 
+@pytest.mark.usefixtures("kept_open")
 async def test_open_and_close_drive_the_motor(hass: HomeAssistant, simulator: WallSimulator, setup: SetupFixture) -> None:
     await setup()
     await hass.services.async_call("cover", "close_cover", {"entity_id": COVER}, blocking=True)
@@ -50,6 +62,7 @@ async def test_open_and_close_drive_the_motor(hass: HomeAssistant, simulator: Wa
     assert hass.states.get(COVER).state in ("open", "closed")
 
 
+@pytest.mark.usefixtures("kept_open")
 async def test_a_position_is_reached_and_the_motor_stopped_there(hass: HomeAssistant, simulator: WallSimulator, setup: SetupFixture) -> None:
     await setup()
     entity, clock = _with_clock(hass)
@@ -80,6 +93,7 @@ async def test_a_full_travel_runs_past_the_estimate_before_the_relay_is_released
     assert hass.states.get(COVER).state == "closed"
 
 
+@pytest.mark.usefixtures("kept_open")
 async def test_a_move_started_at_the_wall_is_followed(hass: HomeAssistant, simulator: WallSimulator, setup: SetupFixture) -> None:
     hub = await setup()
     _entity, clock = _with_clock(hass)
@@ -95,3 +109,30 @@ async def test_a_move_started_at_the_wall_is_followed(hass: HomeAssistant, simul
     assert simulator.output(ROLLER, 1) == 0x00
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=2))
     await hass.async_block_till_done()
+
+
+async def test_a_position_is_unknown_until_a_run_reached_an_end(hass: HomeAssistant, simulator: WallSimulator, setup: SetupFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A module says which way the motor runs, never where the shutter is."""
+    monkeypatch.setattr("custom_components.nikobus_ng.cover.COVER_END_MARGIN", 0.0)
+    await setup()
+    entity, clock = _with_clock(hass)
+    state = hass.states.get(COVER)
+    assert (state.state, state.attributes.get("current_position")) == ("unknown", None)
+    with pytest.raises(HomeAssistantError) as raised:
+        await hass.services.async_call("cover", "set_cover_position", {"entity_id": COVER, "position": 40}, blocking=True)
+    assert raised.value.translation_key == "position_unknown"
+    assert simulator.output(ROLLER, 1) == 0x00
+
+    # It may be closed: an open runs the whole travel, not the nothing a shutter thought open would need.
+    await hass.services.async_call("cover", "open_cover", {"entity_id": COVER}, blocking=True)
+    assert simulator.output(ROLLER, 1) == 0x01
+    clock.now += 5
+    await _tick(hass, entity)
+    assert simulator.output(ROLLER, 1) == 0x01
+    assert hass.states.get(COVER).attributes.get("current_position") is None
+    clock.now += 6
+    await _tick(hass, entity)
+    await _tick(hass, entity)
+    await wait_for(lambda: simulator.output(ROLLER, 1) == 0x00)
+    state = hass.states.get(COVER)
+    assert (state.state, state.attributes["current_position"]) == ("open", 100)

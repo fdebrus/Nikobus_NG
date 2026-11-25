@@ -523,6 +523,9 @@
     },
     "backup_nothing_read": {
       "message": "No module could be read, so nothing was backed up."
+    },
+    "position_unknown": {
+      "message": "The position of this shutter is not known yet. Open or close it fully once; after that it can be sent to a position."
     }
   },
   "selector": {

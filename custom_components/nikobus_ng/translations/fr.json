@@ -523,6 +523,9 @@
     },
     "backup_nothing_read": {
       "message": "Aucun module n'a pu être lu ; rien n'a été sauvegardé."
+    },
+    "position_unknown": {
+      "message": "La position de ce volet n'est pas encore connue. Ouvrez-le ou fermez-le complètement une fois ; il pourra ensuite être envoyé à une position."
     }
   },
   "selector": {
