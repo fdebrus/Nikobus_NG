@@ -79,3 +79,17 @@ async def test_a_press_from_home_assistant_reaches_the_module(hass: HomeAssistan
     await wait_for(lambda: simulator.output(SWITCH, 1) == 0xFF)
     # The gateway does not relay the host's own press: the state comes from the read.
     await wait_for(lambda: hass.states.get("switch.switch_module_4707_output_1").state == "on")
+
+
+async def test_a_key_held_for_over_a_second_is_a_hold_then_a_long_release(hass: HomeAssistant, simulator: WallSimulator, setup: SetupFixture) -> None:
+    """A held key repeats its frame; the burst here lasts a little over a second."""
+    await setup()
+    events: list[tuple[str, int | None]] = []
+    hass.bus.async_listen(
+        EVENT_PRESS, lambda event: events.append((event.data["type"], event.data.get("seconds")))
+    )
+    await simulator.wall_press(KEY_SWITCH_1, frames=30)
+    await wait_for(lambda: bool(events) and events[-1][0] == "long_release")
+    assert events == [("pressed", None), ("hold", 1), ("long_release", 1)]
+    state = hass.states.get(_event_entity(hass, KEY_SWITCH_1))
+    assert (state.attributes["event_type"], state.attributes["seconds"]) == ("long_release", 1)

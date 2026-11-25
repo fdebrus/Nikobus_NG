@@ -99,7 +99,7 @@ To change the connection itself, use **Reconfigure** on the entry.
 |---|---|
 | Switch module output | `switch`, or `light` when ticked as switching a lamp |
 | Dimmer output | `light` with brightness, or `fan` with speed |
-| Roller output | `cover` with a position estimated from its run times |
+| Roller output | `cover` with a position estimated from its run times, unknown until it has run to an end once |
 | Light scene (central function) | `scene`, activated by its own telegram |
 | Function that only moves shutters | `cover` for the group |
 | Each key of a plate, remote or interface | `event` entity, and a press `button` (created disabled) |
@@ -146,7 +146,9 @@ A blueprint, [`nikobus_ng_key_controls_entity.yaml`](blueprints/automation/fdebr
 Home Assistant shows an entity and its state. It cannot show the wiring: which key drives which output, in which mode, for how long. Nikobus NG returns it as data.
 
 - **The `nikobus_ng.describe` action** returns the whole installation: every output with the keys that drive it, every key with what it drives, the scenes with their outputs, the health of the bus.
-- **An LLM API, "Nikobus NG"**, offers the same in pieces to Home Assistant's conversation agents and its MCP server: `nikobus_overview`, `nikobus_output`, `nikobus_key`, `nikobus_scenes`, `nikobus_health`, and `nikobus_press_key`. The first five only read.
+- **An LLM API, "Nikobus NG"**, offers the same in pieces to Home Assistant's conversation agents and its MCP server: `nikobus_overview`, `nikobus_output`, `nikobus_key`, `nikobus_scenes`, `nikobus_health`, and `nikobus_press_key`. The first five only read. Most describe a part of it; the full list of keys and the logical inputs are in the action only.
+
+  **An assistant given these tools sees the whole installation**: every output, key and scene of Nikobus NG with its name, area and state, and it can press any known key. The tools do not follow the per-assistant *Expose* setting, since a key's links cross the house and a partial view could not explain them. Enabling the Nikobus NG tools for an assistant is the one switch that grants this.
 
 A link is said in words, with its values under what they are instead of the vendor's T1 and T2:
 
@@ -200,7 +202,7 @@ How the two differ:
 | Keys | binary sensors and up to seven kinds of bus event | `event` entities, one bus event |
 | Relay as light, dimmer as fan | module customisation | two tick lists |
 | Outputs without a name | no entity | an entity, disabled when no key drives it |
-| Gone modules and plates | detect, then purge | a repair; or delete the device |
+| Gone modules and plates | detect, then purge | a repair for a module; delete the device of either |
 | Scenes made in the options | yes | no: use Home Assistant's own scenes |
 | Refresh interval | adjustable | fixed |
 | Tests | against a stub of Home Assistant | against the real core and a simulated bus |
@@ -237,7 +239,7 @@ What the PC-Link inventory and the link scan recognise comes from the library an
 
 ## What is verified
 
-Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, the simulated PC-Link shipped with the library. Nothing of Home Assistant or of the library is replaced in the tests.
+Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, the simulated PC-Link shipped with the library. The connection, the bus and the modules are never faked: what the simulator lacks (a module's checksum, the PC-Link's clock) is answered by the test, which says so, and a few timing constants are shortened.
 
 **Seen on the one real installation** (a serial PC-Link, six output modules, a Feedback Module, 44 plates; Home Assistant 2026.11):
 
@@ -247,19 +249,19 @@ Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, th
 - The PC-Link's clock read, and set: from 47 minutes ahead to one second.
 - The description: 52 outputs, 154 keys, 4 scenes, 6 logical inputs.
 - A module the PC-Link lists but that is not on the bus: reported, and kept out once its device was deleted.
-- A take-over of 45 outputs, 3 scenes, 6 input switches and 152 keys with their press buttons.
+- A take-over of 45 outputs, 3 scenes, 6 input switches and 152 keys with their press buttons, with the shutter run times set in Nikobus.
+- A key pressed and held at the wall: pressed, held, and released after a short and a long press, as events of its entity (2026-11-13).
 - Devices filed by kind under the bridge.
 
 **Not yet seen on real hardware:**
 
-- A key pressed or held at the wall, as events in Nikobus NG.
 - Switching an output and moving a shutter from Home Assistant, observed end to end.
 - LED keys with a Feedback Module.
 - An audio module, an RGB controller, a motion detector, a Modular Interface.
 - An installation without a PC-Link, and a PC-Link older than generation 3.
 - A module's checksum check and memory backup.
 - The AI tools used by a real conversation agent.
-- The take-over's import of LED keys and shutter run times from a real Nikobus store.
+- The take-over's import of LED keys from a real Nikobus store (that installation had none).
 
 **Limits of the tests themselves:**
 
@@ -277,6 +279,8 @@ Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, th
 - **Names come from the `.nkb`.** The bus carries wiring, not labels.
 - **The RGB controller's colour and brightness cannot be set**, and an audio zone's volume level cannot be read: the bus offers neither.
 - **Calendar programs stay in the PC-Link.** A calendar channel that drives an output is named in `controlled_by`; its program is neither read nor fired.
+- **A shutter's position is unknown until it has run to an end once.** A module says which way the motor runs, never where the shutter is. Until then *open* and *close* run the whole travel, and a position cannot be asked for. The position is kept across restarts.
+- **A dimmer switched on without a level takes the last one seen since Home Assistant started**, and full after a restart.
 - **A press sent by Home Assistant is not echoed.** No event fires for it; the modules it drives are read instead.
 - **The refresh interval is fixed**: every two minutes, or every five for what a Feedback Module does not report.
 
@@ -292,7 +296,7 @@ ruff check .
 
 The code is in `custom_components/nikobus_ng/`: `hub.py` (connection, state, commands), `inventory.py` (the one store), `discovery.py`, `config_flow.py`, one file per platform, `maintenance.py`, `describe.py` and `llm_api.py` (the wiring as data), `takeover.py`. [`CLAUDE.md`](CLAUDE.md) holds the rules the project is developed under.
 
-The design started from a [review of the Nikobus integration](https://github.com/fdebrus/Nikobus-HA/blob/main/documentation/nikobus-ng-review.md). Nikobus NG is about 5 900 lines of Python against 15 000 there.
+The design started from a [review of the Nikobus integration](https://github.com/fdebrus/Nikobus-HA/blob/main/documentation/nikobus-ng-review.md). Nikobus NG is about 6 300 lines of Python against 15 000 there.
 
 ---
 

@@ -183,7 +183,8 @@
     "abort": {
       "not_loaded": "De integratie is niet geladen.",
       "bus_taken": "Er loopt een ontdekking of een controle. Probeer opnieuw wanneer die klaar is.",
-      "nikobus_running": "De Nikobus-integratie is actief. Schakel eerst haar item uit: slechts één programma mag met de bus praten, en haar entiteiten zijn in gebruik."
+      "nikobus_running": "De Nikobus-integratie is actief. Schakel eerst haar item uit: slechts één programma mag met de bus praten, en haar entiteiten zijn in gebruik.",
+      "not_connected": "De gateway is niet verbonden. Probeer opnieuw wanneer de verbinding terug is."
     }
   },
   "device": {
@@ -485,7 +486,7 @@
       "message": "Er loopt al een ontdekking."
     },
     "no_pc_link": {
-      "message": "Geen PC-Link beantwoordde de inventaris. Zonder PC-Link uploadt u het .nkb-project in de opties (Namen uit het projectbestand) en gebruikt u het als inventaris."
+      "message": "Geen PC-Link beantwoordde de inventaris. Zonder PC-Link uploadt u het .nkb-project in de opties (Namen importeren (.nkb)) en gebruikt u het als inventaris."
     },
     "no_modules": {
       "message": "De PC-Link bevat geen uitgangsmodule."
@@ -516,6 +517,15 @@
     },
     "llm_not_a_key": {
       "message": "{key} is geen toets van deze Nikobus-installatie."
+    },
+    "module_did_not_answer": {
+      "message": "Deze modules hebben niet geantwoord: {modules}."
+    },
+    "backup_nothing_read": {
+      "message": "Geen enkele module kon worden gelezen; er is niets opgeslagen."
+    },
+    "position_unknown": {
+      "message": "De positie van dit rolluik is nog niet bekend. Open of sluit het één keer volledig; daarna kan het naar een positie worden gestuurd."
     }
   },
   "selector": {

@@ -39,12 +39,11 @@ API_PROMPT = (
     "anything happens, 'run_time' how long a shutter motor runs, 'level' a dimmer preset, "
     "'dim_time' how long dimming takes ('dim_on_time' and 'dim_off_time' when they differ). A "
     "link with 't1' or 't2' instead is one there is no description for; do not guess what "
-    "those mean. On a plate, the keys A and C are the upper ones and B and D the lower ones, "
-    "A and B on the left; a link on a key says what that key does.\n"
+    "those mean. On a plate, the keys A and C are the upper ones and B and D the lower ones; a "
+    "key's 'position' says where it sits. A link on a key says what that key does.\n"
     "An output's 'value' is 0 when off; a relay that is on reads 255, a dimmer 1 to 255 for its "
-    "level, a shutter 1 while opening and 2 while closing. A light scene sets several outputs "
-    "with one key. A logical input is a condition kept in a controller, with one address that "
-    "sets it and one that clears it.\n"
+    "level, a shutter 1 while opening and 2 while closing; it is null until the module was "
+    "read. A light scene sets several outputs with one key.\n"
     "Start with nikobus_overview to find entity ids. To switch an output, use Home Assistant's "
     "own tools on its entity; press a key only when the point is the key itself."
 )
@@ -85,8 +84,14 @@ def _key(hub: NikobusHub, args: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _press(hub: NikobusHub, args: dict[str, Any]) -> dict[str, Any]:
-    await hub.async_press(args["address"])
-    return {"pressed": args["address"].upper()}
+    address = args["address"].upper()
+    if hub.inventory.key_of(address) is None:
+        # A model can invent an address, or give a plate's instead of a key's.
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="llm_not_a_key", translation_placeholders={"address": address}
+        )
+    await hub.async_press(address)
+    return {"pressed": address}
 
 
 _SPECS = (
@@ -158,7 +163,7 @@ _SPECS = (
             {
                 probatio.Required(
                     "address", description="The key's six-digit hexadecimal address."
-                ): probatio.All(str, probatio.Match(r"^[0-9A-Fa-f]{6}$"))
+                ): probatio.All(str, probatio.Match(r"^[0-9A-Fa-f]{6}\Z"))
             }
         ),
         _PRESS,

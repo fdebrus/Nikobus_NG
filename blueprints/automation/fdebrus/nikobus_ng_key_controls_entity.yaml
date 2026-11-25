@@ -89,3 +89,8 @@ variables:
 actions:
   - action: "homeassistant.{{ behaviour }}"
     target: !input target_entities
+  # A cover has toggle, but neither turn on nor turn off: it is opened or closed.
+  - if: "{{ behaviour != 'toggle' }}"
+    then:
+      - action: "cover.{{ 'open_cover' if behaviour == 'turn_on' else 'close_cover' }}"
+        target: !input target_entities

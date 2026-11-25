@@ -114,6 +114,9 @@ class NikobusCover(ChannelEntity, CoverEntity, RestoreEntity):
         self._commanded = False
         self._end_at: float | None = None
         self._untrack: CALLBACK_TYPE | None = None
+        # A module says which way the motor runs, never where the shutter is:
+        # the position is known once it was kept, or a run reached an end.
+        self._position_known = False
 
     async def async_added_to_hass(self) -> None:
         """Take the last known position back."""
@@ -121,6 +124,7 @@ class NikobusCover(ChannelEntity, CoverEntity, RestoreEntity):
         last = await self.async_get_last_state()
         if last is not None and (position := last.attributes.get(ATTR_CURRENT_POSITION)) is not None:
             self._travel.set_position(float(position))
+            self._position_known = True
         self.async_on_remove(self._stop_ticking)
 
     @property
@@ -135,9 +139,9 @@ class NikobusCover(ChannelEntity, CoverEntity, RestoreEntity):
         }
 
     @property
-    def current_cover_position(self) -> int:
-        """The estimated position, 0 closed to 100 open."""
-        return round(self._travel.current_position())
+    def current_cover_position(self) -> int | None:
+        """The estimated position, 0 closed to 100 open; unknown until a run reached an end."""
+        return round(self._travel.current_position()) if self._position_known else None
 
     @property
     def is_opening(self) -> bool:
@@ -150,9 +154,10 @@ class NikobusCover(ChannelEntity, CoverEntity, RestoreEntity):
         return self._moving == CLOSING
 
     @property
-    def is_closed(self) -> bool:
+    def is_closed(self) -> bool | None:
         """Whether the estimate is fully closed."""
-        return self.current_cover_position == 0
+        position = self.current_cover_position
+        return None if position is None else position == 0
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Run up to the top."""
@@ -164,6 +169,8 @@ class NikobusCover(ChannelEntity, CoverEntity, RestoreEntity):
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Run to a position and stop there."""
+        if not self._position_known:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="position_unknown")
         target = float(kwargs[ATTR_POSITION])
         current = self._travel.current_position()
         if round(target) == round(current):
@@ -188,6 +195,9 @@ class NikobusCover(ChannelEntity, CoverEntity, RestoreEntity):
 
     def _begin(self, direction: str, target: float | None, *, commanded: bool) -> None:
         """The motor started: follow it."""
+        if not self._position_known:
+            # From the far end, so that the run lasts the whole travel.
+            self._travel.set_position(0 if direction == OPENING else 100)
         self._travel.start_travel(direction)
         self._moving = direction
         self._target = target
@@ -223,6 +233,8 @@ class NikobusCover(ChannelEntity, CoverEntity, RestoreEntity):
         if not at_end and not reached:
             self.async_write_ha_state()
             return
+        if at_end:
+            self._position_known = True
         if not self._commanded:
             # Started at the wall: the module ends it by its own run time.
             if at_end:
@@ -287,6 +299,7 @@ class NikobusShutterGroup(NikobusEntity, CoverEntity):
         self._member_ids = [f"{module}_{channel}" for module, channel in members]
         self._bus_address = str(record.get("bus_address") or address).upper()
         self._members: list[str] = []
+        self._untrack_members: CALLBACK_TYPE | None = None
         self._attr_unique_id = f"{address}_group"
         # The key the icon is found under; the name is the device's.
         self._attr_translation_key = "shutter_group"
@@ -297,15 +310,37 @@ class NikobusShutterGroup(NikobusEntity, CoverEntity):
 
     async def async_added_to_hass(self) -> None:
         """Find the members that are shutters here, and follow them."""
+        self._follow_members()
+        self.async_on_remove(self._unfollow_members)
+        self.async_on_remove(
+            self.hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, self._on_registry_update)
+        )
+
+    @callback
+    def _follow_members(self) -> None:
         registry = er.async_get(self.hass)
+        self._unfollow_members()
         self._members = [
             entity_id
             for unique_id in self._member_ids
             if (entity_id := registry.async_get_entity_id(Platform.COVER, DOMAIN, unique_id))
         ]
-        self.async_on_remove(
-            async_track_state_change_event(self.hass, self._members, self._on_member_change)
+        self._untrack_members = async_track_state_change_event(
+            self.hass, self._members, self._on_member_change
         )
+
+    @callback
+    def _unfollow_members(self) -> None:
+        if self._untrack_members is not None:
+            self._untrack_members()
+            self._untrack_members = None
+
+    @callback
+    def _on_registry_update(self, event: Event[er.EventEntityRegistryUpdatedData]) -> None:
+        """A member that changes its entity id, as a take-over does, is followed under the new one."""
+        if event.data.get("old_entity_id") in self._members:
+            self._follow_members()
+            self.async_write_ha_state()
 
     @callback
     def _on_member_change(self, _event: Event[EventStateChangedData]) -> None:
@@ -333,7 +368,7 @@ class NikobusShutterGroup(NikobusEntity, CoverEntity):
     @property
     def available(self) -> bool:
         """With the bus, and with at least one member that is a shutter."""
-        return self.hub.connected and bool(self._positions())
+        return self.hub.connected and bool(self._members)
 
     @property
     def current_cover_position(self) -> int | None:

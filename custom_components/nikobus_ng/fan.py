@@ -19,7 +19,7 @@ from homeassistant.util.percentage import (
     ranged_value_to_percentage,
 )
 
-from .entity import ChannelEntity, outputs_of
+from .entity import DimmedEntity, outputs_of
 from .hub import NikobusHub
 
 PARALLEL_UPDATES = 0
@@ -37,7 +37,7 @@ async def async_setup_entry(
     async_add_entities(NikobusFan(hub, module, channel) for module, channel in outputs_of(hub, Platform.FAN))
 
 
-class NikobusFan(ChannelEntity, FanEntity):
+class NikobusFan(DimmedEntity, FanEntity):
     """A dimmed output; its byte is its speed."""
 
     _attr_supported_features = (
@@ -66,8 +66,11 @@ class NikobusFan(ChannelEntity, FanEntity):
     async def async_turn_on(
         self, percentage: int | None = None, preset_mode: str | None = None, **kwargs: Any
     ) -> None:
-        """Run at the speed given, or at full speed."""
-        await self.async_set_percentage(100 if percentage is None else percentage)
+        """Run at the speed given, or at the last one."""
+        if percentage is None:
+            await self.hub.async_set_output(self._address, self._channel, self._level_to_turn_on)
+            return
+        await self.async_set_percentage(percentage)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Stop the fan."""

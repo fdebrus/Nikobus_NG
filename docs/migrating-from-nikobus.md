@@ -340,9 +340,9 @@ For anything else, open an
 
 Seen on the one real installation: the discovery, the names from the `.nkb`,
 a take-over of 45 outputs, 3 scenes, 6 input switches and 152 keys with their
-press buttons, the import of shutter run times, and the three automations
-above converted and saved.
+press buttons, the import of shutter run times, the three automations above
+converted and saved, and a key pressed and held at the wall arriving as
+events in Nikobus NG.
 
-Not yet seen there: a key pressed or held at the wall arriving as an event in
-Nikobus NG, the import of LED keys (that installation had none), and *Give
-back* on a real registry.
+Not yet seen there: the import of LED keys (that installation had none), and
+*Give back* on a real registry.

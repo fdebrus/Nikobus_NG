@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant
 
 from .const import CONF_CONNECTION
@@ -18,6 +18,12 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry[NikobusHub]
 ) -> dict[str, Any]:
     """What is known of the installation, without names or the connection."""
+    if entry.state is not ConfigEntryState.LOADED:
+        # Without a connection there is no hub; the entry's own data is still worth having.
+        return {
+            "entry": {"data": async_redact_data(dict(entry.data), _REDACT), "options": dict(entry.options)},
+            "state": entry.state.value,
+        }
     hub = entry.runtime_data
     inventory = hub.inventory
     status = hub.discovery.status

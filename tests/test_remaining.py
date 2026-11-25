@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
@@ -16,7 +16,10 @@ from nikobus_connect.nkb import NkbConfig, NkbData
 from nikobus_simulator.gateway import PRESS_DEBOUNCE
 from nikobus_simulator.module import SimulatedModule
 from nikobus_simulator.topology import ModuleSpec
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    mock_restore_cache,
+)
 
 from custom_components.nikobus_ng.const import (
     CONF_FAN_OUTPUTS,
@@ -137,11 +140,13 @@ async def test_a_function_that_only_moves_shutters_is_a_group_cover(hass: HomeAs
             ],
         }
     }
+    members = ["cover.roller_shutter_module_9105_output_1", "cover.roller_shutter_module_9105_output_2"]
+    # Open when Home Assistant last stopped: a position is known once kept.
+    mock_restore_cache(hass, [State(member, "open", {"current_position": 100}) for member in members])
     await setup()
     registry = er.async_get(hass)
     assert registry.async_get_entity_id("scene", DOMAIN, f"{GROUP}_scene") is None
     group = registry.async_get_entity_id("cover", DOMAIN, f"{GROUP}_group")
-    members = ["cover.roller_shutter_module_9105_output_1", "cover.roller_shutter_module_9105_output_2"]
     assert hass.states.get(group).attributes["entity_id"] == members
     assert hass.states.get(group).state == "open"
 

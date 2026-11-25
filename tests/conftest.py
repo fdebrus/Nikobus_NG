@@ -1,6 +1,6 @@
 """Fixtures: a real Home Assistant, the real library, a simulated bus.
 
-Nothing of Home Assistant or of nikobus-connect is replaced. The bus is
+The connection, the bus and the modules are never faked. The bus is
 ``nikobus-simulator``, which speaks the PC-Link protocol over TCP and
 answers from the memory a real module would hold.
 

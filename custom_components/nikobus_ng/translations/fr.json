@@ -183,7 +183,8 @@
     "abort": {
       "not_loaded": "L'intégration n'est pas chargée.",
       "bus_taken": "Une découverte ou une vérification est en cours. Réessayez quand elle est terminée.",
-      "nikobus_running": "L'intégration Nikobus est en cours d'exécution. Désactivez d'abord son entrée : un seul programme peut parler au bus, et ses entités sont utilisées."
+      "nikobus_running": "L'intégration Nikobus est en cours d'exécution. Désactivez d'abord son entrée : un seul programme peut parler au bus, et ses entités sont utilisées.",
+      "not_connected": "La passerelle n'est pas connectée. Réessayez quand la connexion est rétablie."
     }
   },
   "device": {
@@ -485,7 +486,7 @@
       "message": "Une découverte est déjà en cours."
     },
     "no_pc_link": {
-      "message": "Aucun PC-Link n'a répondu à l'inventaire. Sans PC-Link, envoyez le projet .nkb dans les options (Noms du fichier projet) et utilisez-le comme inventaire."
+      "message": "Aucun PC-Link n'a répondu à l'inventaire. Sans PC-Link, envoyez le projet .nkb dans les options (Importer les noms (.nkb)) et utilisez-le comme inventaire."
     },
     "no_modules": {
       "message": "Le PC-Link ne contient aucun module de sortie."
@@ -516,6 +517,15 @@
     },
     "llm_not_a_key": {
       "message": "{key} n'est pas une touche de cette installation Nikobus."
+    },
+    "module_did_not_answer": {
+      "message": "Ces modules n'ont pas répondu : {modules}."
+    },
+    "backup_nothing_read": {
+      "message": "Aucun module n'a pu être lu ; rien n'a été sauvegardé."
+    },
+    "position_unknown": {
+      "message": "La position de ce volet n'est pas encore connue. Ouvrez-le ou fermez-le complètement une fois ; il pourra ensuite être envoyé à une position."
     }
   },
   "selector": {

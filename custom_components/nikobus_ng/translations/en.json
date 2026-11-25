@@ -183,7 +183,8 @@
     "abort": {
       "not_loaded": "The integration is not loaded.",
       "bus_taken": "A discovery or a check is running. Try again when it has ended.",
-      "nikobus_running": "The Nikobus integration is running. Disable its entry first: only one program may talk to the bus, and its entities are in use."
+      "nikobus_running": "The Nikobus integration is running. Disable its entry first: only one program may talk to the bus, and its entities are in use.",
+      "not_connected": "The gateway is not connected. Try again when the connection is back."
     }
   },
   "device": {
@@ -485,7 +486,7 @@
       "message": "A discovery is already running."
     },
     "no_pc_link": {
-      "message": "No PC-Link answered the inventory. Without a PC-Link, upload the .nkb project in the options (Names from the project file) and use it as the inventory."
+      "message": "No PC-Link answered the inventory. Without a PC-Link, upload the .nkb project in the options (Import names (.nkb)) and use it as the inventory."
     },
     "no_modules": {
       "message": "The PC-Link holds no output module."
@@ -516,6 +517,15 @@
     },
     "llm_not_a_key": {
       "message": "{key} is not a key of this Nikobus installation."
+    },
+    "module_did_not_answer": {
+      "message": "These modules did not answer: {modules}."
+    },
+    "backup_nothing_read": {
+      "message": "No module could be read, so nothing was backed up."
+    },
+    "position_unknown": {
+      "message": "The position of this shutter is not known yet. Open or close it fully once; after that it can be sent to a position."
     }
   },
   "selector": {

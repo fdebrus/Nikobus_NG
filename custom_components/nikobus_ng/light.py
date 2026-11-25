@@ -21,7 +21,7 @@ from nikobus_connect.rgb import (
 )
 
 from .const import DIMMER_MODULE, DOMAIN, GROUP_OUTPUT_MODULES, MANUFACTURER
-from .entity import ChannelEntity, NikobusEntity, OnOffEntity, outputs_of
+from .entity import DimmedEntity, NikobusEntity, OnOffEntity, outputs_of
 from .hub import NikobusHub
 
 PARALLEL_UPDATES = 0
@@ -41,7 +41,7 @@ async def async_setup_entry(
     async_add_entities(NikobusRgbLight(hub, address, entry) for address, entry in hub.inventory.rgb_modules())
 
 
-class NikobusLight(ChannelEntity, LightEntity):
+class NikobusLight(DimmedEntity, LightEntity):
     """A dimmed output; its byte is its level."""
 
     _attr_color_mode = ColorMode.BRIGHTNESS
@@ -59,8 +59,8 @@ class NikobusLight(ChannelEntity, LightEntity):
         return self._value
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Set the level; full when none is given."""
-        level = max(1, min(255, int(kwargs.get(ATTR_BRIGHTNESS, 255))))
+        """Set the level; the last one when none is given."""
+        level = max(1, min(255, int(kwargs.get(ATTR_BRIGHTNESS, self._level_to_turn_on))))
         await self.hub.async_set_output(self._address, self._channel, level)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
