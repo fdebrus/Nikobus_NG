@@ -12,11 +12,16 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import label_registry as lr
 from nikobus_connect.discovery import meaning
+from nikobus_connect.discovery.fileio import merge_discovered_buttons
+from nikobus_connect.discovery.mapping import DEVICE_TYPES, KEY_MAPPING
+from nikobus_connect.discovery.protocol import convert_nikobus_address
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.nikobus_ng import async_remove_config_entry_device
 from custom_components.nikobus_ng.const import DOMAIN
 from custom_components.nikobus_ng.describe import _explained
+from custom_components.nikobus_ng.entity import position_mark
+from custom_components.nikobus_ng.inventory import Key
 from custom_components.nikobus_ng.llm_api import API_PROMPT
 
 from .conftest import (
@@ -33,7 +38,7 @@ from .conftest import (
 )
 from .test_remaining import _options, _reloaded
 
-KEY_EVENT = "event.bus_push_button_4_control_buttons_n1843b4_key_1c_upper_right"
+KEY_EVENT = "event.bus_push_button_4_control_buttons_n1843b4_key_1c_2"
 
 
 async def test_a_scanned_link_is_said_in_words_with_its_values_named(hass: HomeAssistant, scanned: SetupFixture) -> None:
@@ -242,14 +247,14 @@ async def test_an_entity_shows_what_it_is_on_the_bus(
 
 
 async def test_a_key_of_a_wall_plate_says_where_it_sits(hass: HomeAssistant, setup: SetupFixture) -> None:
-    """The simulated plates are four-key plates (05-064): 1C is the upper right key."""
+    """The simulated plates are four-key plates (05-064): 1C is the upper key of the second column."""
     await setup()
     state = hass.states.get(KEY_EVENT)
-    assert state.name.endswith("Key 1C · upper right")
+    assert state.name.endswith("Key 1C ↑2")
     assert state.attributes["position"] == "upper_right"
     registry = er.async_get(hass)
     press = registry.async_get(registry.async_get_entity_id("button", DOMAIN, f"{KEY_SWITCH_1}_press"))
-    assert (press.translation_key, press.original_name) == ("press_key_upper_right", "Press 1C · upper right")
+    assert press.original_name == "Press 1C ↑2"
     described = await hass.services.async_call(DOMAIN, "describe", {}, blocking=True, return_response=True)
     assert next(k for k in described["keys"] if k["address"] == KEY_SWITCH_1)["position"] == "upper_right"
 
@@ -269,3 +274,35 @@ async def test_a_press_button_says_what_a_press_reaches(hass: HomeAssistant, sca
     assert (button["bus_address"], button["position"]) == (KEY_SWITCH_1, "upper_right")
     shared = ("bus_address", "wall_button_address", "wall_button_key", "position", "drives", "linked_outputs")
     assert {name: button[name] for name in shared} == {name: event[name] for name in shared}
+
+
+@pytest.mark.parametrize(
+    ("device_type", "marks"),
+    [
+        pytest.param("04", {"1A": " ↑1", "1B": " ↓1"}, id="two-keys"),
+        pytest.param("06", {"1A": " ↑1", "1B": " ↓1", "1C": " ↑2", "1D": " ↓2"}, id="four-keys"),
+        pytest.param(
+            "12",
+            {"1A": " ↑1", "1B": " ↓1", "1C": " ↑2", "1D": " ↓2", "2A": " ↑3", "2B": " ↓3", "2C": " ↑4", "2D": " ↓4"},
+            id="eight-keys",
+        ),
+        pytest.param("21", {"1A": "", "1B": ""}, id="an-interface-has-no-plate"),
+    ],
+)
+def test_a_key_is_marked_with_its_row_and_its_column(device_type: str, marks: dict[str, str]) -> None:
+    """The plate entries are the ones the library writes for an inventoried device."""
+    product = DEVICE_TYPES[device_type]
+    buttons: dict[str, Any] = {"nikobus_button": {}}
+    discovered = {
+        PLATE: {
+            "category": "Button",
+            "device_type": device_type,
+            "model": product["Model"],
+            "channels": product["Channels"],
+            "description": product["Name"],
+        }
+    }
+    merge_discovered_buttons(buttons, discovered, KEY_MAPPING, convert_nikobus_address)
+    entry = buttons["nikobus_button"][PLATE]
+    keys = [Key(PLATE, label, point["bus_address"], entry) for label, point in entry["operation_points"].items()]
+    assert {key.label: position_mark(key) for key in keys} == marks

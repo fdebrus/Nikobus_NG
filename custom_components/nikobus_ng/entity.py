@@ -130,6 +130,27 @@ def outputs_of(hub: NikobusHub, platform: Platform) -> list[tuple[OutputModule, 
     return mine
 
 
+_COLUMNS = {"left": 1, "mid_left": 2, "mid_right": 3, "right": 4}
+
+
+def position_mark(key: Key) -> str:
+    """A key's place as its name carries it: its row as an arrow, its column counted from the left.
+
+    " ↑2" is the upper key of the second column; nothing for a key
+    that sits on no plate. Arrows keep the name short, and need no
+    translation.
+    """
+    position = key.position
+    if position is None:
+        return ""
+    row, _, side = position.partition("_")
+    column = _COLUMNS.get(side, 1)
+    if side == "right" and len(key.plate_entry.get("operation_points") or {}) == 4:
+        # The right column of a four-key plate is its second.
+        column = 2
+    return f" {'↑' if row == 'upper' else '↓'}{column}"
+
+
 def key_details(hub: NikobusHub, key: Key) -> dict[str, Any]:
     """What a key is on the bus and what it drives, for its event entity and its press button."""
     inventory = hub.inventory
