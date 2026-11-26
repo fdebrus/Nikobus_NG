@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from nikobus_connect.discovery import is_motion_detector
 
-from .entity import NikobusEntity, key_details, plate_device
+from .entity import NikobusEntity, key_details, plate_device, position_mark
 from .hub import NikobusHub
 from .inventory import Key
 from .presses import EVENT_TYPES
@@ -44,9 +44,7 @@ class NikobusKeyEvent(NikobusEntity, EventEntity):
         super().__init__(hub)
         self._bus_address = key.bus_address
         self._attr_unique_id = f"{key.bus_address}_event"
-        self._attr_translation_placeholders = {"key": key.label}
-        if key.position is not None:
-            self._attr_translation_key = f"key_{key.position}"
+        self._attr_translation_placeholders = {"key": key.label, "mark": position_mark(key)}
         self._attr_device_info = plate_device(hub, key.plate, key.plate_entry)
         self._attr_extra_state_attributes = key_details(hub, key)
 

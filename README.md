@@ -140,7 +140,7 @@ Everything is optional and lives under **Configure** on the integration's entry.
 
 - **Devices are filed by kind** under the **Nikobus Bridge**: *Output modules*, *System modules*, *Wall buttons*, *Remotes*, *Interfaces*, *Scenes* and *Shutter groups*.
 - **Names follow the Nikobus software.** A plate the project file names is shown as `11: Boudoir (Hall)`, a module as `Dimcontroller (Cellar)`.
-- **A key says where it sits**: "Key 1C · upper right" on a plate with two, four or eight keys, also as its `position` attribute. The layouts are the vendor manual's drawings of the plates. Names you gave are kept, and entity IDs do not change.
+- **A key says where it sits**, in its name: an arrow for its row and its column counted from the left. "Key 1C ↑2" is the upper key of the second column, on a plate with two, four or eight keys. Its `position` attribute says the same in words (`upper_right`). The layouts are the vendor manual's drawings of the plates. Names you gave are kept, and entity IDs do not change.
 - **An output no key drives is created disabled.** Enable it if you use it from Home Assistant only. An output with a name from the project file, or on a module whose links could not all be read, is enabled.
 - **Deleting the device of a module or a plate** leaves it out from then on, through later discoveries too.
 

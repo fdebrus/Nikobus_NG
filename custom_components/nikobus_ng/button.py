@@ -9,7 +9,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from nikobus_connect.discovery import is_motion_detector
 
-from .entity import GatewayEntity, NikobusEntity, key_details, plate_device
+from .entity import (
+    GatewayEntity,
+    NikobusEntity,
+    key_details,
+    plate_device,
+    position_mark,
+)
 from .hub import NikobusHub
 from .inventory import Key
 
@@ -96,9 +102,7 @@ class NikobusKeyButton(NikobusEntity, ButtonEntity):
         super().__init__(hub)
         self._bus_address = key.bus_address
         self._attr_unique_id = f"{key.bus_address}_press"
-        self._attr_translation_placeholders = {"key": key.label}
-        if key.position is not None:
-            self._attr_translation_key = f"press_key_{key.position}"
+        self._attr_translation_placeholders = {"key": key.label, "mark": position_mark(key)}
         self._attr_device_info = plate_device(hub, key.plate, key.plate_entry)
         # What a press reaches, to read before pressing.
         self._attr_extra_state_attributes = key_details(hub, key)
