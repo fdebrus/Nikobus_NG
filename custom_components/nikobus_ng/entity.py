@@ -130,7 +130,9 @@ def outputs_of(hub: NikobusHub, platform: Platform) -> list[tuple[OutputModule, 
     return mine
 
 
-_COLUMNS = {"left": 1, "mid_left": 2, "mid_right": 3, "right": 4}
+#: The column of each key, from the left: the same on every plate, since a
+#: plate with fewer keys has the first columns of the eight-key one.
+_COLUMNS = {"1A": 1, "1B": 1, "1C": 2, "1D": 2, "2A": 3, "2B": 3, "2C": 4, "2D": 4}
 
 
 def position_mark(key: Key) -> str:
@@ -141,14 +143,10 @@ def position_mark(key: Key) -> str:
     translation.
     """
     position = key.position
-    if position is None:
+    column = _COLUMNS.get(key.label.upper())
+    if position is None or column is None:
         return ""
-    row, _, side = position.partition("_")
-    column = _COLUMNS.get(side, 1)
-    if side == "right" and len(key.plate_entry.get("operation_points") or {}) == 4:
-        # The right column of a four-key plate is its second.
-        column = 2
-    return f" {'↑' if row == 'upper' else '↓'}{column}"
+    return f" {'↑' if position.startswith('upper') else '↓'}{column}"
 
 
 def key_details(hub: NikobusHub, key: Key) -> dict[str, Any]:
