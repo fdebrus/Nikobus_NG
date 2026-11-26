@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from nikobus_connect.discovery import is_motion_detector
 
-from .entity import GatewayEntity, NikobusEntity, plate_device
+from .entity import GatewayEntity, NikobusEntity, key_details, plate_device
 from .hub import NikobusHub
 from .inventory import Key
 
@@ -89,6 +89,8 @@ class NikobusKeyButton(NikobusEntity, ButtonEntity):
 
     _attr_entity_registry_enabled_default = False
     _attr_translation_key = "press_key"
+    # The wiring does not change with a press: it is not worth a row per press.
+    _unrecorded_attributes = frozenset({"linked_outputs", "drives"})
 
     def __init__(self, hub: NikobusHub, key: Key) -> None:
         super().__init__(hub)
@@ -98,6 +100,8 @@ class NikobusKeyButton(NikobusEntity, ButtonEntity):
         if key.position is not None:
             self._attr_translation_key = f"press_key_{key.position}"
         self._attr_device_info = plate_device(hub, key.plate, key.plate_entry)
+        # What a press reaches, to read before pressing.
+        self._attr_extra_state_attributes = key_details(hub, key)
 
     async def async_added_to_hass(self) -> None:
         """Follow the connection."""

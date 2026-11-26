@@ -252,3 +252,20 @@ async def test_a_key_of_a_wall_plate_says_where_it_sits(hass: HomeAssistant, set
     assert (press.translation_key, press.original_name) == ("press_key_upper_right", "Press 1C · upper right")
     described = await hass.services.async_call(DOMAIN, "describe", {}, blocking=True, return_response=True)
     assert next(k for k in described["keys"] if k["address"] == KEY_SWITCH_1)["position"] == "upper_right"
+
+
+async def test_a_press_button_says_what_a_press_reaches(hass: HomeAssistant, scanned: SetupFixture) -> None:
+    """The same details as the key's event entity: a press acts on every output listed."""
+    await scanned()
+    registry = er.async_get(hass)
+    press = registry.async_get_entity_id("button", DOMAIN, f"{KEY_SWITCH_1}_press")
+    registry.async_update_entity(press, disabled_by=None)
+    await hass.config_entries.async_reload(next(iter(hass.config_entries.async_entries(DOMAIN))).entry_id)
+    await hass.async_block_till_done()
+    button, event = hass.states.get(press).attributes, hass.states.get(KEY_EVENT).attributes
+    assert button["drives"] == "Switch module (4707) output 1"
+    assert [(link["module_address"], link["channel"]) for link in button["linked_outputs"]] == [(SWITCH, 1)]
+    assert button["linked_outputs"][0]["does"]
+    assert (button["bus_address"], button["position"]) == (KEY_SWITCH_1, "upper_right")
+    shared = ("bus_address", "wall_button_address", "wall_button_key", "position", "drives", "linked_outputs")
+    assert {name: button[name] for name in shared} == {name: event[name] for name in shared}

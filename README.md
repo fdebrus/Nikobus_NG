@@ -18,78 +18,105 @@
   <a href="https://github.com/fdebrus/Nikobus_NG/stargazers"><img src="https://img.shields.io/github/stars/fdebrus/Nikobus_NG?style=flat&label=Stars" alt="GitHub stars"></a>
 </p>
 
-Control your **Nikobus** installation from Home Assistant: switches, dimmers and shutters as native entities, every key as an event for your automations, and the wiring of the installation as data an AI assistant can read. Modules, plates and links are **read from the bus in one discovery**, and names, rooms and scenes come from your **`.nkb` project file**.
+**Your Nikobus installation in Home Assistant, read straight from the bus.** Switches, dimmers and shutters become native entities, every key becomes an event for your automations, and the wiring itself (which key drives which output, and how) becomes data an AI assistant can read.
 
-Nikobus NG ("Next Generation") is a second integration, written from scratch next to the [Nikobus integration](https://github.com/fdebrus/Nikobus-HA) on the same protocol library, [nikobus-connect](https://github.com/fdebrus/nikobus-connect). The name says what it is: a fresh design of the same thing, not its successor yet. Nikobus stays, and stays maintained. The two use different domains and can be installed side by side, one enabled at a time.
+Modules, plates and links are found by **one discovery**. Names, rooms and scenes come from your **`.nkb` project file**.
 
 > **Experimental.** Nikobus NG runs on one real installation so far, and most of it has only been tested against a simulated PC-Link. [What is verified](#what-is-verified) says exactly what has and has not been seen on hardware. Testers are welcome, especially with hardware listed there as not seen.
 
-### Highlights
+<p align="left">
+  <a href="#quick-start"><b>Quick start</b></a> ·
+  <a href="#what-you-get">What you get</a> ·
+  <a href="#key-presses-in-automations">Key presses</a> ·
+  <a href="#for-ai-assistants">AI assistants</a> ·
+  <a href="#coming-from-nikobus">Coming from Nikobus</a> ·
+  <a href="#supported-hardware">Hardware</a> ·
+  <a href="#what-is-verified">What is verified</a> ·
+  <a href="#known-limitations">Limitations</a>
+</p>
+
+### What "NG" means
+
+Nikobus NG ("Next Generation") is a second integration, written from scratch next to the [Nikobus integration](https://github.com/fdebrus/Nikobus-HA) on the same protocol library, [nikobus-connect](https://github.com/fdebrus/nikobus-connect). It is a fresh design of the same thing, not its successor yet: Nikobus stays, and stays maintained. The two use different domains and can be installed side by side, one enabled at a time.
+
+---
+
+## Highlights
+
+**Finds your installation**
 
 - 🔌 **One discovery** — one button reads the PC-Link inventory and every module's links, and it starts by itself on first setup. One module can be read again on its own.
-- 💡 **Native entities** — a relay is a `switch` or a `light`, a dimmer output a `light` with brightness or a `fan` with speed, a shutter a `cover` with an estimated position.
-- 🎛️ **Keys are event entities** — one per key, with `pressed`, `hold`, `short_release` and `long_release`, plus one bus event for automations on any address.
-- 🤖 **Made for AI assistants** — an action and a set of tools return the wiring: which key drives which output, in which mode, said in plain words. An assistant can answer "which button switches the kitchen light?".
-- 🧭 **Every output names what drives it** — the keys and PC-Link calendar channels are in its `controlled_by` attribute.
 - 📥 **Names from your `.nkb`** — modules, plates (numbered as in the Nikobus software), outputs, rooms as areas, and light scenes.
+
+**Shows it as Home Assistant expects**
+
+- 💡 **Native entities** — a relay is a `switch` or a `light`, a dimmer output a `light` with brightness or a `fan` with speed, a shutter a `cover` with an estimated position.
+- 🎛️ **Keys are event entities** — one per key, with `pressed`, `hold`, `short_release` and `long_release`, named with where the key sits on its plate.
 - 🎬 **Scenes and shutter groups** — light scenes are activated by their own telegram; a function that only moves shutters is a `cover` for the group.
 - 🚥 **LED keys** — an output can be switched by pressing its key, so the plate's LED follows what Home Assistant does.
 - 🔊 **Audio zones and RGB controller** — a `media_player` per zone, a `light` for a colour controller.
+
+**Explains itself**
+
+- 🧭 **Every output names what drives it** — the keys and PC-Link calendar channels are in its `controlled_by` attribute, each link said in plain words.
+- 🤖 **Made for AI assistants** — an action and a set of tools return the wiring, so an assistant can answer "which button switches the kitchen light?".
 - 🩺 **Repairs that say what to do** — a module that stopped answering or was reprogrammed, a wrong port, a module of the wrong type; several come with a fix button.
+
+**Stays safe**
+
 - 🛡️ **Read-only maintenance** — check every module's programming, back up its memory, see the PC-Link's clock. Setting that clock is the only thing ever written.
-- 🔁 **A take-over from Nikobus** — moves entity IDs, names, areas, labels, voice exposure, LED keys and shutter run times across, and can be undone.
+- 🔁 **A take-over from Nikobus that can be undone** — entity IDs, names, areas, labels, voice exposure, LED keys and shutter run times move across.
 
 ---
 
 ## Quick start
 
-1. **Disable the Nikobus entry** if you have one: only one program may talk to the bus.
-2. **Install** through HACS as a custom repository (button below) and restart Home Assistant.
-3. **Add the integration**: *Settings → Devices & services → Add integration → Nikobus NG*. Enter the serial port (`/dev/ttyUSB0`) or the TCP bridge (`192.168.2.50:9999`).
-4. **Wait for the discovery.** It starts by itself; follow it on the *Discovery* sensor of the **Nikobus Bridge** device. Entities appear when it ends. A large installation takes a few minutes.
-5. *(Optional)* **Upload your `.nkb`** under *Configure → Import names (.nkb)* for names, rooms and scenes.
-6. *(Optional)* Press **Back up programming** once and keep the folder somewhere safe.
-
-Coming from the Nikobus integration? See [Coming from Nikobus](#coming-from-nikobus).
-
----
-
-## Prerequisites
+**You need**
 
 - **Home Assistant 2026.10 or later.**
-- **A serial gateway to the bus**, normally a **PC-Link (05-200)**: it holds the inventory the discovery reads and relays everything on the bus. Without one, the `.nkb` project file or two hand-written files can stand in for the inventory.
-- **One client at a time.** Stop the Nikobus PC software, and disable the Nikobus integration, before starting Nikobus NG.
-- **A connection path**: a USB/serial adapter or a TCP-to-serial bridge (`host:port`).
-- *(Optional)* **a Feedback Module (05-207)**. Tick the option at setup when Home Assistant is on the PC-Link's port: the module's own reads are then picked up and Home Assistant reads only what it leaves out.
-- *(Optional)* **your `.nkb` project file**, the only place your names, rooms and scene names live.
+- **A PC-Link (05-200)** on a USB/serial adapter (`/dev/ttyUSB0`) or behind a TCP-to-serial bridge (`192.168.2.50:9999`). It holds the inventory the discovery reads. Without one, your `.nkb` or two hand-written files can stand in for it.
+- **The bus to yourself.** Only one program may talk to it: stop the Nikobus PC software, and disable the Nikobus integration if you have it.
+- *(Optional)* **Your `.nkb` project file**, the only place your names, rooms and scene names live.
 
----
+**Steps**
 
-## Installation & setup
-
-1. Install through HACS with the button below, or add `https://github.com/fdebrus/Nikobus_NG` under *HACS → ⋮ → Custom repositories* as an *Integration*:
+1. **Install** through HACS:
 
    [![Add to HACS](https://img.shields.io/badge/HACS-Add%20Custom%20Repository-blue.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=fdebrus&repository=Nikobus_NG&category=integration)
 
-   Without HACS, copy `custom_components/nikobus_ng` into `config/custom_components`, under that exact name.
-2. Restart Home Assistant.
-3. *Settings → Devices & services → Add integration → Nikobus NG*, and enter the serial path or `host:port`. The connection is tested at once.
-4. Tick **A Feedback Module is installed** if it applies.
+   Then restart Home Assistant.
+2. **Add the integration**: *Settings → Devices & services → Add integration → Nikobus NG*. Enter the serial port or `host:port`; the connection is tested at once.
+3. **Tick *A Feedback Module is installed*** if you have a Feedback Module (05-207) and Home Assistant is on the PC-Link's port. Its own reads are then picked up, and Home Assistant reads only what it leaves out.
+4. **Wait for the discovery.** It starts by itself; follow it on the *Discovery* sensor of the **Nikobus Bridge** device. Entities appear when it ends. A large installation takes a few minutes.
+5. *(Optional)* **Import your names**: *Configure → Import names (.nkb)*.
+6. *(Optional)* Press **Back up programming** once and keep the folder somewhere safe.
 
-Everything else is under **Configure** on the integration's entry:
+<details>
+<summary>Installing without the button, or without HACS</summary>
 
-| Menu | What it sets |
+- **HACS, by hand:** *HACS → ⋮ → Custom repositories*, add `https://github.com/fdebrus/Nikobus_NG` as an *Integration*, then install *Nikobus NG*.
+- **Without HACS:** copy `custom_components/nikobus_ng` into `config/custom_components`, under that exact name, and restart.
+
+</details>
+
+Coming from the Nikobus integration? Follow **[Moving from Nikobus to Nikobus NG](docs/migrating-from-nikobus.md)** instead.
+
+---
+
+## Settings
+
+Everything is optional and lives under **Configure** on the integration's entry. To change the connection itself, use **Reconfigure**.
+
+| Menu | What it is for |
 |---|---|
-| Import names (.nkb) | upload the `.nkb`: names, rooms as areas, scene names |
-| Lights and fans | which relays are lights, which dimmer outputs are fans, labels by kind |
-| Shutter run times | show it as a cover, switch or light; its run times and end margin |
-| Keep button LEDs in sync | the keys pressed to switch it on and off, so the plate's LED follows |
-| Gateway | Feedback Module, a PC-Link older than generation 3, telegrams per press |
-| Correct a module's type | correct a module the inventory has as another type |
-| Import inventory files | for an installation with neither a PC-Link nor a `.nkb` |
-| Take over from Nikobus | see [Coming from Nikobus](#coming-from-nikobus) |
-
-To change the connection itself, use **Reconfigure** on the entry.
+| **Import names (.nkb)** | Upload the project file: names, rooms as areas, scene names. |
+| **Lights and fans** | Say which relays switch a lamp and which dimmer outputs drive a fan; label entities by kind. |
+| **Shutter run times** | How long a shutter takes each way and its end margin; or show a roller output as a switch or light. |
+| **Keep button LEDs in sync** | The keys pressed to switch an output on and off, so the plate's LED follows. |
+| **Gateway** | Feedback Module, a PC-Link older than generation 3, telegrams per press. |
+| **Correct a module's type** | For a module the inventory lists as another type. Rarely needed. |
+| **Import inventory files** | For an installation with neither a PC-Link nor a `.nkb`. |
+| **Take over from Nikobus** | See [Coming from Nikobus](#coming-from-nikobus). |
 
 ---
 
@@ -99,7 +126,7 @@ To change the connection itself, use **Reconfigure** on the entry.
 |---|---|
 | Switch module output | `switch`, or `light` when ticked as switching a lamp |
 | Dimmer output | `light` with brightness, or `fan` with speed |
-| Roller output | `cover` with a position estimated from its run times, unknown until it has run to an end once |
+| Roller output | `cover` with a position estimated from its run times |
 | Light scene (central function) | `scene`, activated by its own telegram |
 | Function that only moves shutters | `cover` for the group |
 | Each key of a plate, remote or interface | `event` entity, and a press `button` (created disabled) |
@@ -109,19 +136,37 @@ To change the connection itself, use **Reconfigure** on the entry.
 | RGB controller | `light`: on or off and its colour, switched by its linked keys |
 | The gateway | connection, discovery, programming and clock sensors; four buttons |
 
-Devices are filed by kind under the **Nikobus Bridge**: *Output modules*, *System modules*, *Wall buttons*, *Remotes*, *Interfaces*, *Scenes* and *Shutter groups*. A plate the project file names is shown as `11: Boudoir (Hall)`, a module as `Dimcontroller (Cellar)`.
+**How it is organised**
 
-A key of a wall plate with two, four or eight keys is named with where it sits, "Key 1C · upper right", and carries it as its `position` attribute; the layouts are the vendor manual's drawings of the plates. Names you gave are kept, and entity IDs do not change.
+- **Devices are filed by kind** under the **Nikobus Bridge**: *Output modules*, *System modules*, *Wall buttons*, *Remotes*, *Interfaces*, *Scenes* and *Shutter groups*.
+- **Names follow the Nikobus software.** A plate the project file names is shown as `11: Boudoir (Hall)`, a module as `Dimcontroller (Cellar)`.
+- **A key says where it sits**: "Key 1C · upper right" on a plate with two, four or eight keys, also as its `position` attribute. The layouts are the vendor manual's drawings of the plates. Names you gave are kept, and entity IDs do not change.
+- **An output no key drives is created disabled.** Enable it if you use it from Home Assistant only. An output with a name from the project file, or on a module whose links could not all be read, is enabled.
+- **Deleting the device of a module or a plate** leaves it out from then on, through later discoveries too.
 
-Each entity shows what it is on the bus in its attributes, with every link as the module holds it (`mode`, `t1`, `t2`, the record itself) next to what it does: an output its module, channel and the keys that drive it; a shutter its run times and end margin; a key its plate and the outputs it drives, with what each link does; a scene its outputs and the keys that trigger it.
+**What an entity tells you**
 
-An output no key drives is created disabled; enable it if you use it from Home Assistant only. Deleting the device of a module or a plate leaves it out from then on, through later discoveries too.
+Open an entity's details to see what it is on the bus, with every link as the module holds it (`mode`, `t1`, `t2`, the record itself) next to what the link does:
+
+| Entity | Its attributes |
+|---|---|
+| An output | its module and channel, and the keys that drive it |
+| A shutter | its run times and end margin, and who moved it last |
+| A key, and its press button | its plate and position, the outputs it drives (`drives` in one line, `linked_outputs` in full) |
+| A scene | its outputs, and the keys that trigger it |
 
 ---
 
 ## Key presses in automations
 
-A press gives `pressed` at its first telegram, `hold` with `seconds` 1, 2 and 3 while it goes on, and at its end `short_release` (under a second) or `long_release`, with `duration` and with `seconds`, the whole seconds it was held (3 for three or more).
+One press gives up to four kinds of event:
+
+| When | `type` | Comes with |
+|---|---|---|
+| At the first telegram | `pressed` | |
+| While the key stays down, each second | `hold` | `seconds`: 1, 2, 3 |
+| Released within a second | `short_release` | `duration`, `seconds` |
+| Released later | `long_release` | `duration`, `seconds` (3 for three or more) |
 
 Trigger on the key's **event entity**, or on the bus event **`nikobus_ng_press`**, which also fires for an address the inventory does not know:
 
@@ -135,20 +180,25 @@ triggers:
       seconds: 2
 ```
 
-Quote the address: an all-digit address with an `E` in it is otherwise read as a number.
+Two things to get right:
 
-A blueprint, [`nikobus_ng_key_controls_entity.yaml`](blueprints/automation/fdebrus/nikobus_ng_key_controls_entity.yaml), lets a key switch an entity of any integration.
+- **Always give a `type`.** Without it the automation fires on the press, on each second it is held, and on the release.
+- **Quote the address.** An all-digit address with an `E` in it is otherwise read as a number.
+
+A blueprint, [`nikobus_ng_key_controls_entity.yaml`](blueprints/automation/fdebrus/nikobus_ng_key_controls_entity.yaml), lets a key toggle, switch, open or close an entity of any integration.
 
 ---
 
 ## For AI assistants
 
-Home Assistant shows an entity and its state. It cannot show the wiring: which key drives which output, in which mode, for how long. Nikobus NG returns it as data.
+Home Assistant shows an entity and its state. It cannot show the wiring: which key drives which output, in which mode, for how long. Nikobus NG returns it as data, in two ways.
 
-- **The `nikobus_ng.describe` action** returns the whole installation: every output with the keys that drive it, every key with what it drives, the scenes with their outputs, the health of the bus.
-- **An LLM API, "Nikobus NG"**, offers the same in pieces to Home Assistant's conversation agents and its MCP server: `nikobus_overview`, `nikobus_output`, `nikobus_key`, `nikobus_scenes`, `nikobus_health`, and `nikobus_press_key`. The first five only read. Most describe a part of it; the full list of keys and the logical inputs are in the action only.
+| | What it gives | For |
+|---|---|---|
+| **The `nikobus_ng.describe` action** | The whole installation at once: every output with the keys that drive it, every key with what it drives, the scenes, the logical inputs, the health of the bus. | scripts, and pasting into a chat |
+| **The "Nikobus NG" tools** | The same in pieces: `nikobus_overview`, `nikobus_output`, `nikobus_key`, `nikobus_scenes`, `nikobus_health`, which only read, and `nikobus_press_key`. | Home Assistant's conversation agents and its MCP server |
 
-  **An assistant given these tools sees the whole installation**: every output, key and scene of Nikobus NG with its name, area and state, and it can press any known key. The tools do not follow the per-assistant *Expose* setting, since a key's links cross the house and a partial view could not explain them. Enabling the Nikobus NG tools for an assistant is the one switch that grants this.
+> **An assistant given these tools sees the whole installation**: every output, key and scene of Nikobus NG with its name, area and state, and it can press any known key. The tools do not follow the per-assistant *Expose* setting, since a key's links cross the house and a partial view could not explain them. Enabling the Nikobus NG tools for an assistant is the one switch that grants this.
 
 A link is said in words, with its values under what they are instead of the vendor's T1 and T2:
 
@@ -161,7 +211,7 @@ A link is said in words, with its values under what they are instead of the vend
 }
 ```
 
-The wording is the library's, taken from the vendor's manuals. A mode on two or four keys is said for the key the link is on: "This key switches the output on; the lower key of the pair switches it off." On a plate, keys A and C are the upper ones, B and D the lower ones.
+The wording is the library's, taken from the vendor's manuals. A mode on two or four keys is said for the key the link is on: "This key switches the output on; the lower key of the pair switches it off."
 
 ---
 
@@ -169,30 +219,13 @@ The wording is the library's, taken from the vendor's manuals. A mode on two or 
 
 Nikobus NG can be tried without losing anything: it has its own domain and its own store, and re-enabling the Nikobus entry takes you back.
 
-The step-by-step guide, with the actions and entities that change and the way back, is **[Moving from Nikobus to Nikobus NG](docs/migrating-from-nikobus.md)**.
+**The step-by-step guide is [Moving from Nikobus to Nikobus NG](docs/migrating-from-nikobus.md)**: what to prepare, what moves by itself, what you change by hand, and the way back.
 
-**Take over** (*Configure → Take over from Nikobus*), with the Nikobus entry disabled, moves onto Nikobus NG's entities:
+In short:
 
-- the entity ID, name, area, aliases, labels, icon and voice-assistant exposure of lights, switches, covers, fans, scenes, input switches and key press buttons, so dashboards, automations and history keep working;
-- relays that were lights become lights;
-- the LED keys, shutter run times and end margins set per output.
-
-The form says what it would do before anything moves. The Nikobus entities are parked under their ID followed by `_nikobus`, and **Give back** undoes it. It can be run again; what was taken before is left alone.
-
-What you change by hand:
-
-- **Automations on Nikobus bus events.** A key is a binary sensor in Nikobus and an event entity here; the event entity takes the sensor's ID under `event.`.
-
-  | Nikobus bus event | Here: `type` of `nikobus_ng_press` |
-  |---|---|
-  | `nikobus_button_pressed` | `pressed` |
-  | `nikobus_button_timer_1`, `_2`, `_3` | `hold` with `seconds` 1, 2, 3 |
-  | `nikobus_short_button_pressed` | `short_release` |
-  | `nikobus_long_button_pressed` | `long_release` |
-  | `nikobus_button_released` | either release; `duration` is its `duration_s` |
-  | `nikobus_button_pressed_0` … `_3` | a release with `seconds` 0 … 3 |
-
-- **Names, from Home Assistant 2026.11.** Home Assistant now always shows the device's name in front of an entity's. An output reads "Dimcontroller (Cellar) Wall lights" where the Nikobus entity, named before that upgrade, still reads "Wall lights". Aliases and voice exposure are carried, so an assistant still knows the short name.
+- **Take over** (*Configure → Take over from Nikobus*, with the Nikobus entry disabled) moves entity IDs, names, areas, aliases, labels, icons and voice exposure onto Nikobus NG's entities, so dashboards, automations on entities and history keep working. LED keys and shutter run times come along.
+- **The form says what it would do before anything moves**, the Nikobus entities are parked under `<id>_nikobus`, and **Give back** undoes it. Removing the Nikobus NG entry gives everything back too.
+- **By hand:** automations on Nikobus bus events (`nikobus_button_pressed` and the others) and calls to `nikobus.*` actions. The guide has the mapping.
 
 How the two differ:
 
@@ -239,9 +272,10 @@ What the PC-Link inventory and the link scan recognise comes from the library an
 
 ## What is verified
 
-Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, the simulated PC-Link shipped with the library. The connection, the bus and the modules are never faked: what the simulator lacks (a module's checksum, the PC-Link's clock) is answered by the test, which says so, and a few timing constants are shortened.
+Nikobus NG runs on **one real installation**: a serial PC-Link, six output modules, a Feedback Module and 44 plates, on Home Assistant 2026.11. Everything else is tested against the real Home Assistant and `nikobus-simulator`, the simulated PC-Link shipped with the library.
 
-**Seen on the one real installation** (a serial PC-Link, six output modules, a Feedback Module, 44 plates; Home Assistant 2026.11):
+<details>
+<summary><b>Seen on the real installation</b></summary>
 
 - Setup, both passes of the discovery, and the read of every output group.
 - Names, rooms and the three light scenes from its `.nkb`; six logical inputs.
@@ -253,7 +287,10 @@ Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, th
 - A key pressed and held at the wall: pressed, held, and released after a short and a long press, as events of its entity (2026-11-13).
 - Devices filed by kind under the bridge.
 
-**Not yet seen on real hardware:**
+</details>
+
+<details>
+<summary><b>Not yet seen on real hardware</b></summary>
 
 - Switching an output and moving a shutter from Home Assistant, observed end to end.
 - LED keys with a Feedback Module.
@@ -263,26 +300,38 @@ Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, th
 - The AI tools used by a real conversation agent.
 - The take-over's import of LED keys from a real Nikobus store (that installation had none).
 
-**Limits of the tests themselves:**
+</details>
 
-- The simulator has no inventory, no checksum, no clock and no colour controller; tests that need one stand in for it and say so.
+<details>
+<summary><b>Limits of the tests themselves</b></summary>
+
+- The connection, the bus and the modules are never faked. What the simulator lacks (the PC-Link's inventory, a module's checksum, the clock, a colour controller) is answered by the test, which says so, and a few timing constants are shortened.
 - The test harness runs Home Assistant 2026.10. Entity naming changed in 2026.11; that rule is checked against the 2026.11 source, not on a running 2026.11.
+
+</details>
 
 ---
 
 ## Known limitations
 
-- **One client per bus.** Stop any other Nikobus software before starting.
-- **One config entry.** Two buses cannot share one Home Assistant.
-- **No auto-discovery of the gateway.** The serial path or `host:port` is entered by hand.
-- **Read-only by design.** A module's programming is never written: no restore from a backup. Setting the PC-Link clock is the only write.
+**By design**
+
+- **Read-only.** A module's programming is never written: no restore from a backup. Setting the PC-Link clock is the only write.
+- **One client per bus, one config entry.** Stop any other Nikobus software; two buses cannot share one Home Assistant.
 - **Names come from the `.nkb`.** The bus carries wiring, not labels.
-- **The RGB controller's colour and brightness cannot be set**, and an audio zone's volume level cannot be read: the bus offers neither.
-- **Calendar programs stay in the PC-Link.** A calendar channel that drives an output is named in `controlled_by`; its program is neither read nor fired.
-- **A shutter's position is unknown until it has run to an end once.** A module says which way the motor runs, never where the shutter is. Until then *open* and *close* run the whole travel, and a position cannot be asked for. The position is kept across restarts.
-- **A dimmer switched on without a level takes the last one seen since Home Assistant started**, and full after a restart.
-- **A press sent by Home Assistant is not echoed.** No event fires for it; the modules it drives are read instead.
+- **The gateway is not auto-discovered.** The serial path or `host:port` is entered by hand.
 - **The refresh interval is fixed**: every two minutes, or every five for what a Feedback Module does not report.
+
+**What the bus does not offer**
+
+- **A shutter's position.** A module says which way the motor runs, never where the shutter is. The position is estimated, and unknown until the shutter has run to an end once: until then *open* and *close* run the whole travel, and a position cannot be asked for. It is kept across restarts.
+- **The RGB controller's colour and brightness cannot be set**, and an audio zone's volume level cannot be read.
+- **A press sent by Home Assistant is not echoed.** No event fires for it; the modules it drives are read instead.
+
+**Good to know**
+
+- **Calendar programs stay in the PC-Link.** A calendar channel that drives an output is named in `controlled_by`; its program is neither read nor fired.
+- **A dimmer switched on without a level takes the last one seen since Home Assistant started**, and full after a restart.
 
 ---
 
@@ -290,7 +339,7 @@ Nikobus NG is tested against the real Home Assistant and `nikobus-simulator`, th
 
 ```bash
 pip install -r requirements_test.txt   # Python 3.14; Home Assistant and nikobus-simulator
-python -m pytest -q                    # about 150 tests, 7 to 8 minutes
+python -m pytest -q                    # about 180 tests, 9 to 10 minutes
 ruff check .
 ```
 

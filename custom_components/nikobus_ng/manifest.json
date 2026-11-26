@@ -1,6 +1,7 @@
 {
   "domain": "nikobus_ng",
   "name": "Nikobus NG",
+  "categories": ["hubs_protocols.building_automation"],
   "codeowners": ["@fdebrus"],
   "config_flow": true,
   "dependencies": ["file_upload"],
@@ -11,5 +12,5 @@
   "loggers": ["nikobus_connect"],
   "requirements": ["nikobus-connect>=0.57.10"],
   "single_config_entry": true,
-  "version": "0.10.9"
+  "version": "0.10.10"
 }
