@@ -1,6 +1,7 @@
 {
   "domain": "nikobus_ng",
   "name": "Nikobus NG",
+  "categories": ["hubs_protocols.building_automation"],
   "codeowners": ["@fdebrus"],
   "config_flow": true,
   "dependencies": ["file_upload"],
