@@ -36,7 +36,7 @@ from .const import (
 
 if TYPE_CHECKING:
     from .hub import NikobusHub
-    from .inventory import OutputModule
+    from .inventory import Key, OutputModule
 
 _GATEWAY_MODELS = {"pc_link": "PC-Link", "feedback_module": "Feedback module", "pc_logic": "PC-Logic"}
 
@@ -128,6 +128,27 @@ def outputs_of(hub: NikobusHub, platform: Platform) -> list[tuple[OutputModule, 
             elif entity_id := registry.async_get_entity_id(platform, DOMAIN, f"{module.address}_{channel}"):
                 registry.async_remove(entity_id)
     return mine
+
+
+def key_details(hub: NikobusHub, key: Key) -> dict[str, Any]:
+    """What a key is on the bus and what it drives, for its event entity and its press button."""
+    inventory = hub.inventory
+    linked = inventory.linked_outputs(key)
+    details: dict[str, Any] = {
+        "bus_address": key.bus_address,
+        "wall_button_address": key.plate,
+        "wall_button_key": key.label,
+        "wall_button_model": key.plate_entry.get("model"),
+        "wall_button_type": key.plate_entry.get("type"),
+        # One line to read at a glance; the links themselves follow.
+        "drives": ", ".join(link["name"] or f"{link['module']} output {link['channel']}" for link in linked),
+        "linked_outputs": linked,
+    }
+    if key.position is not None:
+        details["position"] = key.position
+    if (scene := inventory.scenes.get(key.bus_address)) is not None:
+        details["triggers_scene"] = inventory.scene_name(scene) or key.bus_address
+    return details
 
 
 class NikobusEntity(Entity):

@@ -152,7 +152,7 @@ Open an entity's details to see what it is on the bus, with every link as the mo
 |---|---|
 | An output | its module and channel, and the keys that drive it |
 | A shutter | its run times and end margin, and who moved it last |
-| A key | its plate and position, and the outputs it drives |
+| A key, and its press button | its plate and position, the outputs it drives (`drives` in one line, `linked_outputs` in full) |
 | A scene | its outputs, and the keys that trigger it |
 
 ---
