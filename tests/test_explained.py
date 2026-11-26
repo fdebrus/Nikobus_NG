@@ -286,6 +286,11 @@ async def test_a_press_button_says_what_a_press_reaches(hass: HomeAssistant, sca
             {"1A": " ↑1", "1B": " ↓1", "1C": " ↑2", "1D": " ↓2", "2A": " ↑3", "2B": " ↓3", "2C": " ↑4", "2D": " ↓4"},
             id="eight-keys",
         ),
+        pytest.param(
+            "0C",
+            {"1A": " ↑1", "1B": " ↓1", "1C": " ↑2", "1D": " ↓2", "IR:01A": ""},
+            id="four-keys-and-an-ir-receiver",
+        ),
         pytest.param("21", {"1A": "", "1B": ""}, id="an-interface-has-no-plate"),
     ],
 )
@@ -304,5 +309,8 @@ def test_a_key_is_marked_with_its_row_and_its_column(device_type: str, marks: di
     }
     merge_discovered_buttons(buttons, discovered, KEY_MAPPING, convert_nikobus_address)
     entry = buttons["nikobus_button"][PLATE]
+    if "IR:01A" in marks:
+        # A code learnt by the plate's receiver is filed with its keys.
+        entry["operation_points"]["IR:01A"] = {"bus_address": "0D1C80", "linked_modules": []}
     keys = [Key(PLATE, label, point["bus_address"], entry) for label, point in entry["operation_points"].items()]
     assert {key.label: position_mark(key) for key in keys} == marks
